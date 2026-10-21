@@ -14,6 +14,16 @@
 
 ---
 
+## 📸 Extension Preview
+
+<p align="center">
+  <img src="assets/preview.png" alt="Zapcue in Action on YouTube" width="100%" />
+</p>
+
+> **Zapcue running live on YouTube:** Embedded seamlessly in the right sidebar directly above recommended videos. Featuring real-time video stats, collapsible description, timestamp toggle, live search, and one-click copy & export.
+
+---
+
 ## 🌟 What is Zapcue?
 
 **Zapcue** is a high-performance, privacy-first Chrome Extension (Manifest V3) that extracts rich YouTube video metadata (Title, Channel, Views, Likes, Duration, Upload Date, Description) and complete timestamped transcripts in milliseconds.
@@ -30,8 +40,8 @@ Instead of annoying floating overlays or complex cloud services, **Zapcue embeds
 - **🎯 Embedded YouTube Native Sidebar (Zero Floating Popups):**
   Neatly injected directly above related videos in YouTube's right column (`#secondary-inner`). Looks and feels like a native YouTube component with smooth drawer behavior.
 
-- **🎨 Hand-Drawn Doodle Play Button Branding:**
-  Custom-designed organic vector doodle artwork for browser icons, popup, and in-page drawer header.
+- **🎨 Zapcue Mascot Branding:**
+  Vibrant custom lightning flame mascot artwork for browser toolbar icons, popup menu, and in-page drawer header.
 
 - **🌓 Auto Dark / Light Theme Sync:**
   Detects YouTube's active theme attribute in real time and adapts backgrounds, text contrast, borders, and shadows dynamically (`#0f0f0f` dark mode / `#ffffff` light mode).
