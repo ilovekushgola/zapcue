@@ -1,6 +1,7 @@
 import { ExtractorResult } from '../../types';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { downloadFile, sanitizeFilename, toJSON, toMarkdown, toTXT } from '../utils/export';
+import { ZAPCUE_LOGO_DATA_URI } from './mascot-data';
 import { ensureHostPosition, getOrCreateShadowRoot } from './shadow-host';
 import panelStyles from './styles.css?inline';
 
@@ -151,8 +152,8 @@ export class ExtractorPanel {
         <style>${panelStyles}</style>
         <div class="minimized-pill" id="dash-expand-btn">
           <div class="minimized-brand">
-            ${SVG_ICONS.logo}
-            <span>YouTube Extractor Drawer</span>
+            <img src="${ZAPCUE_LOGO_DATA_URI}" width="22" height="22" alt="Zapcue Mascot" style="display:block;">
+            <span>Zapcue Drawer</span>
           </div>
           <span class="minimized-hint">Click to Open ▾</span>
         </div>
@@ -246,8 +247,8 @@ export class ExtractorPanel {
         <!-- 1. Header: Video Title + Close Button -->
         <div class="panel-header">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-            <div style="flex-shrink: 0; width: 22px; height: 22px; display: flex; align-items: center;">${SVG_ICONS.logo}</div>
-            <h2 class="video-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(m?.title || 'YouTube Extractor')}</h2>
+            <img src="${ZAPCUE_LOGO_DATA_URI}" width="24" height="24" alt="Zapcue Mascot" style="flex-shrink: 0; display: block;">
+            <h2 class="video-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(m?.title || 'Zapcue')}</h2>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
             <label class="switch-toggle" title="Auto-extract on new videos" style="width: 28px; height: 16px;">
@@ -318,7 +319,7 @@ export class ExtractorPanel {
           <div class="transcript-top-bar">
             <div class="transcript-header-row">
               <div class="transcript-title">
-                <div style="flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center;">${SVG_ICONS.logo}</div>
+                <img src="${ZAPCUE_LOGO_DATA_URI}" width="18" height="18" alt="Zapcue Mascot" style="flex-shrink: 0; display: block;">
                 <span>Transcript</span>
                 ${t?.available ? `<span class="status-badge">Auto-extracted</span>` : ''}
               </div>

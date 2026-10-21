@@ -1,12 +1,24 @@
-# ⚡ YouTube Meta & Transcript Extractor
+# ⚡ Zapcue — YouTube Metadata & Transcript Extractor
 
-> A high-performance, privacy-focused Chrome Extension (Manifest V3) that extracts rich YouTube video metadata and complete transcripts in milliseconds — embedded directly into YouTube's native sidebar layout.
+<p align="center">
+  <img src="public/icons/icon128.png" width="120" height="120" alt="Zapcue Mascot Logo" />
+  <br />
+  <strong>Sub-second YouTube metadata & transcript extraction with native sidebar drawer UI.</strong>
+</p>
 
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-success?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/mv3/)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Vite 6](https://img.shields.io/badge/Vite-6.0-646CFF?style=flat-square&logo=vite)](https://vitejs.dev/)
 [![Tests Passing](https://img.shields.io/badge/Tests-11%2F11%20Passing-brightgreen?style=flat-square)](tests/extractor.test.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+
+---
+
+## 🌟 What is Zapcue?
+
+**Zapcue** is a high-performance, privacy-first Chrome Extension (Manifest V3) that extracts rich YouTube video metadata (Title, Channel, Views, Likes, Duration, Upload Date, Description) and complete timestamped transcripts in milliseconds.
+
+Instead of annoying floating overlays or complex cloud services, **Zapcue embeds directly into YouTube's native sidebar** (above recommended videos), perfectly matching YouTube's dark and light theme styles.
 
 ---
 
@@ -62,8 +74,8 @@ The project includes standalone design prototypes inside `prototypes/`:
 
 1. **Clone or download this repository:**
    ```bash
-   git clone https://github.com/ilovekushgola/yt-meta-extractor.git
-   cd yt-meta-extractor
+   git clone https://github.com/ilovekushgola/zapcue.git
+   cd zapcue
    ```
 
 2. **Install dependencies and compile:**
@@ -79,18 +91,18 @@ The project includes standalone design prototypes inside `prototypes/`:
 
 4. **Load the Extension:**
    - Click the **Load unpacked** button (top-left).
-   - Select the `dist/` folder inside the `yt-meta-extractor` directory.
+   - Select the `dist/` folder inside the `zapcue` directory.
 
 5. **Test on YouTube:**
    - Open any YouTube video (e.g., `https://www.youtube.com/watch?v=...`) or Shorts.
-   - The Extractor Drawer will appear in the right column above recommended videos!
+   - The Zapcue Drawer will appear in the right column above recommended videos!
 
 ---
 
 ## 🏗️ Architecture & Technical Stack
 
 ```
-yt-meta-extractor/
+zapcue/
 ├── public/
 │   ├── manifest.json            # Manifest V3 configuration
 │   └── icons/                   # Vector logo + generated PNGs (16, 32, 48, 128)
