@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT Meta Extractor</title>
+  <link rel="stylesheet" href="./popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <div class="logo">
+        <svg viewBox="0 0 500 500" width="24" height="24" style="display:block;">
+          <path d="M 120 120 C 170 115, 310 112, 360 120 C 410 128, 435 160, 440 240 C 445 320, 420 355, 360 365 C 300 375, 180 375, 120 365 C 60 355, 35 320, 40 240 C 45 160, 70 125, 120 120 Z" fill="#ff0000" stroke="#000000" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 105 136 C 88 152, 75 178, 72 195" stroke="#ffffff" stroke-width="14" stroke-linecap="round" fill="none"/>
+          <path d="M 68 215 C 67 240, 68 260, 70 275" stroke="#ffffff" stroke-width="12" stroke-linecap="round" fill="none"/>
+          <path d="M 408 200 C 418 220, 420 240, 418 250" stroke="#ffffff" stroke-width="12" stroke-linecap="round" fill="none"/>
+          <polygon points="195,190 310,250 195,310" fill="#ffffff" stroke="#000000" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M 183 194 C 176 230, 178 280, 185 306" stroke="#000000" stroke-width="10" stroke-linecap="round" fill="none"/>
+          <path d="M 292 228 C 308 238, 320 246, 325 258 C 315 272, 298 284, 280 294" stroke="#000000" stroke-width="10" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span class="title">YT Extractor</span>
+      </div>
+      <span class="version">v1.0.0</span>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-item">
+        <div class="setting-info">
+          <label for="auto-extract-toggle">Auto Extract</label>
+          <span class="desc">Automatically extract upon opening videos</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="auto-extract-toggle" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <label for="lang-select">Preferred Language</label>
+          <span class="desc">Priority for transcript tracks</span>
+        </div>
+        <select id="lang-select" class="dropdown">
+          <option value="en">English (en)</option>
+          <option value="hi">Hindi (hi)</option>
+          <option value="es">Spanish (es)</option>
+          <option value="fr">French (fr)</option>
+          <option value="de">German (de)</option>
+          <option value="ja">Japanese (ja)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="status-box">
+      <span class="status-indicator"></span>
+      <span id="status-text">Active on YouTube tabs</span>
+    </div>
+
+    <div class="footer">
+      <span>High-Speed DOM & Captions Engine</span>
+    </div>
+  </div>
+  <script type="module" src="./popup.ts"></script>
+</body>
+</html>

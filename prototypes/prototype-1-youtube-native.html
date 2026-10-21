@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design 1: YouTube Native Luxe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Roboto", "YouTube Sans", Arial, sans-serif; }
+    body { background-color: #0f0f0f; color: #f1f1f1; padding: 24px; display: flex; justify-content: center; }
+    
+    .panel-preview {
+      width: 400px;
+      background: #0f0f0f;
+      border: 1px solid #272727;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    /* Header */
+    .p-header {
+      padding: 12px 16px;
+      background: #0f0f0f;
+      border-bottom: 1px solid #272727;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .p-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .p-title-icon {
+      color: #ff0033;
+      display: flex;
+      align-items: center;
+    }
+    .p-actions-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .auto-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #aaa;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 30px;
+      height: 16px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #3f3f3f; transition: .2s; border-radius: 16px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 12px; width: 12px; left: 2px; bottom: 2px;
+      background-color: white; transition: .2s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #3ea6ff; }
+    input:checked + .slider:before { transform: translateX(14px); }
+
+    /* Video Info Section */
+    .p-video-info {
+      padding: 12px 16px;
+      background: #181818;
+      border-bottom: 1px solid #272727;
+    }
+    .p-video-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #fff;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .p-meta-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .p-meta-dot { color: #555; }
+    .p-meta-highlight { color: #3ea6ff; font-weight: 500; }
+
+    /* Search Box */
+    .p-search-box {
+      padding: 10px 16px;
+      background: #0f0f0f;
+      border-bottom: 1px solid #272727;
+    }
+    .search-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #121212;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 7px 12px;
+      transition: border-color 0.15s ease;
+    }
+    .search-input-wrap:focus-within {
+      border-color: #3ea6ff;
+    }
+    .search-icon { color: #888; font-size: 14px; }
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: #fff;
+    }
+    .search-input::placeholder { color: #717171; }
+
+    /* Transcript Scroll Area */
+    .p-transcript-list {
+      height: 320px;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #0f0f0f;
+    }
+    .p-transcript-list::-webkit-scrollbar { width: 6px; }
+    .p-transcript-list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+    .p-segment {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .p-segment:hover {
+      background: #212121;
+    }
+    .p-timestamp {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #3ea6ff;
+      background: rgba(62, 166, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .p-text {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: #e2e8f0;
+      flex: 1;
+    }
+
+    /* Actions Footer: Only 2 Buttons */
+    .p-footer {
+      padding: 12px 16px;
+      background: #181818;
+      border-top: 1px solid #272727;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    /* Button 1: Copy Button */
+    .btn-copy {
+      flex: 1;
+      background: #272727;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 9px 12px;
+      border-radius: 18px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .btn-copy:hover {
+      background: #3f3f3f;
+    }
+
+    /* Button 2: Split Export Button */
+    .split-btn {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+    .split-main {
+      flex: 1;
+      background: #f1f1f1;
+      color: #0f0f0f;
+      border: none;
+      padding: 9px 12px;
+      border-top-left-radius: 18px;
+      border-bottom-left-radius: 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .split-main:hover { background: #fff; }
+    .split-caret {
+      background: #e5e5e5;
+      color: #0f0f0f;
+      border: none;
+      border-left: 1px solid rgba(0,0,0,0.15);
+      padding: 9px 10px;
+      border-top-right-radius: 18px;
+      border-bottom-right-radius: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+    }
+    .split-caret:hover { background: #fff; }
+
+    /* Dropdown Menu */
+    .dropdown-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      width: 170px;
+      background: #212121;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 4px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 100;
+    }
+    .dropdown-menu.show { display: flex; }
+    .menu-item {
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .menu-item:hover { background: #333; }
+    .badge-default {
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(62, 166, 255, 0.2);
+      color: #3ea6ff;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    /* Toast */
+    .toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #212121;
+      border: 1px solid #444;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel-preview">
+    <!-- Header -->
+    <div class="p-header">
+      <div class="p-title-group">
+        <span class="p-title-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </span>
+        <span>Transcript</span>
+      </div>
+      <div class="p-actions-top">
+        <div class="auto-toggle-wrap">
+          <span>Auto</span>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Info -->
+    <div class="p-video-info">
+      <div class="p-video-title">We went to Germany to see if it is really Dying</div>
+      <div class="p-meta-line">
+        <span>Aevy TV</span>
+        <span class="p-meta-dot">•</span>
+        <span class="p-meta-highlight">1,012,595 views</span>
+        <span class="p-meta-dot">•</span>
+        <span>12,438 likes</span>
+        <span class="p-meta-dot">•</span>
+        <span>24:35</span>
+      </div>
+    </div>
+
+    <!-- Search Input -->
+    <div class="p-search-box">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" placeholder="Search in video" id="searchInput">
+      </div>
+    </div>
+
+    <!-- Transcript Segments -->
+    <div class="p-transcript-list" id="segmentList">
+      <div class="p-segment">
+        <span class="p-timestamp">0:44</span>
+        <span class="p-text">was standing in the immigration line before entering Germany.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">0:47</span>
+        <span class="p-text">I'm next.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">0:48</span>
+        <span class="p-text">And I'm anxious, which makes no sense because I've done nothing wrong.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">0:54</span>
+        <span class="p-text">But still, I found myself rehearsing my own face so that I could look normal and get approval.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">1:00</span>
+        <span class="p-text">But then I realized that you don't say a common anxiety because you know how it is.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">1:05</span>
+        <span class="p-text">Inside Germany we found a small Indian community that's thriving and right beside it, Indians who are struggling.</span>
+      </div>
+      <div class="p-segment">
+        <span class="p-timestamp">1:14</span>
+        <span class="p-text">Whether you're curious about how countries work or dreaming of a life in Germany, this video is the honest version.</span>
+      </div>
+    </div>
+
+    <!-- Actions Footer: Only 2 Buttons -->
+    <div class="p-footer">
+      <button class="btn-copy" id="btnCopy">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span>Copy</span>
+      </button>
+
+      <div class="split-btn">
+        <button class="split-main" id="btnExport">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export</span>
+        </button>
+        <button class="split-caret" id="btnCaret">▾</button>
+
+        <div class="dropdown-menu" id="exportMenu">
+          <button class="menu-item" id="optMd">
+            <span>Markdown (.md)</span>
+            <span class="badge-default">DEFAULT</span>
+          </button>
+          <button class="menu-item" id="optJson">
+            <span>JSON (.json)</span>
+          </button>
+          <button class="menu-item" id="optTxt">
+            <span>Plain Text (.txt)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="toast" id="toastBox">✓ Copied to clipboard!</div>
+    </div>
+  </div>
+
+  <script>
+    const btnCaret = document.getElementById('btnCaret');
+    const exportMenu = document.getElementById('exportMenu');
+    const toastBox = document.getElementById('toastBox');
+
+    btnCaret.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportMenu.classList.toggle('show');
+    });
+
+    document.addEventListener('click', () => {
+      exportMenu.classList.remove('show');
+    });
+
+    function showToast(msg) {
+      toastBox.textContent = '✓ ' + msg;
+      toastBox.style.display = 'block';
+      setTimeout(() => { toastBox.style.display = 'none'; }, 1800);
+    }
+
+    document.getElementById('btnCopy').addEventListener('click', () => showToast('Transcript Copied!'));
+    document.getElementById('btnExport').addEventListener('click', () => showToast('Downloading Markdown (.md)...'));
+    document.getElementById('optMd').addEventListener('click', () => showToast('Downloading Markdown (.md)...'));
+    document.getElementById('optJson').addEventListener('click', () => showToast('Downloading JSON (.json)...'));
+    document.getElementById('optTxt').addEventListener('click', () => showToast('Downloading Plain Text (.txt)...'));
+  </script>
+</body>
+</html>

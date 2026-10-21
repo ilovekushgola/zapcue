@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Meta & Transcript Extractor",
+  "version": "1.0.0",
+  "description": "Extract YouTube video metadata and complete transcripts in milliseconds. In-page UI, copy & export to JSON, MD, TXT.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/watch*",
+        "*://*.youtube.com/shorts/*"
+      ],
+      "js": ["content/bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://*.youtube.com/watch*",
+        "*://*.youtube.com/shorts/*"
+      ],
+      "js": ["content/index.js"],
+      "world": "ISOLATED",
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

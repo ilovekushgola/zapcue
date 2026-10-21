@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Extractor — UI Design Showcase & Voting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #08080a;
+      --bg-header: #121318;
+      --border-header: #22242e;
+      --text-main: #f1f1f1;
+      --yt-card-bg: #181818;
+      --yt-text: #fff;
+    }
+
+    body.light-theme {
+      --bg-page: #f9f9f9;
+      --bg-header: #ffffff;
+      --border-header: #e5e7eb;
+      --text-main: #0f0f0f;
+      --yt-card-bg: #f2f2f2;
+      --yt-text: #0f0f0f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+    body { background: var(--bg-page); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; transition: background 0.2s ease, color 0.2s ease; }
+
+    /* Top Showcase Bar */
+    .showcase-header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-header);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .brand-badge {
+      background: #e1002d;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .design-switcher {
+      display: flex;
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border-header);
+      border-radius: 30px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .design-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      opacity: 0.7;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 7px 15px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .design-tab:hover { opacity: 1; }
+    .design-tab.active {
+      background: #e1002d;
+      color: #fff;
+      opacity: 1;
+      box-shadow: 0 2px 10px rgba(225, 0, 45, 0.35);
+    }
+
+    .theme-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--border-header);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 18px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    /* Main Container (Simulating YouTube 2-Column Layout) */
+    .yt-mock-layout {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 410px;
+      gap: 24px;
+    }
+
+    /* Left Column: YouTube Video & Description Mock */
+    .yt-primary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .yt-player-mock {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .yt-play-btn {
+      width: 68px;
+      height: 48px;
+      background: rgba(33, 33, 33, 0.85);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 24px;
+    }
+    .yt-mock-title {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--yt-text);
+    }
+    .yt-mock-channel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-header);
+      padding-bottom: 12px;
+    }
+    .yt-mock-desc {
+      background: var(--yt-card-bg);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    /* Right Column: Embedded Extractor + Recommended Videos */
+    .yt-secondary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .prototype-frame-container {
+      width: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      min-height: 720px;
+    }
+    .prototype-frame {
+      width: 100%;
+      height: 720px;
+      border: none;
+      display: block;
+    }
+
+    .yt-rec-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      opacity: 0.6;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 6px;
+    }
+
+    .yt-rec-card {
+      display: flex;
+      gap: 10px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 8px;
+      transition: background 0.15s ease;
+    }
+    .yt-rec-card:hover { background: var(--yt-card-bg); }
+    .rec-thumb {
+      width: 130px;
+      height: 74px;
+      background: var(--yt-card-bg);
+      border-radius: 8px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #888;
+    }
+    .rec-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      justify-content: center;
+    }
+    .rec-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--yt-text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .rec-channel {
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Switcher -->
+  <header class="showcase-header">
+    <div class="brand-title">
+      <span>⚡ YouTube Extractor UI Concepts</span>
+      <span class="brand-badge">PROTOTYPE SHOWCASE</span>
+    </div>
+
+    <div class="design-switcher">
+      <button class="design-tab active" data-src="prototype-7-youtube-sidebar-native.html" id="tab7">
+        ⭐ 1. YouTube Native Drawer (Screenshot Spec)
+      </button>
+      <button class="design-tab" data-src="prototype-5-youtube-dark.html" id="tab5">
+        🌙 2. YouTube Dark Tokens
+      </button>
+      <button class="design-tab" data-src="prototype-4-youtube-light.html" id="tab4">
+        ☀️ 3. YouTube Light Tokens
+      </button>
+      <button class="design-tab" data-src="prototype-6-youtube-light-v2.html" id="tab6">
+        ✨ 4. YouTube Light v2 (Studio Soft)
+      </button>
+      <button class="design-tab" data-src="prototype-2-notion-studio.html" id="tab2">
+        5. Notion Studio
+      </button>
+    </div>
+
+    <button class="theme-toggle-btn" id="themeToggleBtn">☀️ Toggle Light Background</button>
+  </header>
+
+  <!-- YouTube 2-Column Mock View -->
+  <main class="yt-mock-layout">
+    
+    <!-- Left Column: Video, Title, Description -->
+    <section class="yt-primary-col">
+      <div class="yt-player-mock">
+        <div class="yt-play-btn">▶</div>
+        <div style="position: absolute; bottom: 16px; left: 16px; font-size: 13px; background: rgba(0,0,0,0.7); color:#fff; padding: 4px 8px; border-radius: 4px;">
+          ⏱ 24:35
+        </div>
+      </div>
+
+      <div class="yt-mock-title">We went to Germany to see if it is really Dying</div>
+
+      <div class="yt-mock-channel">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #e1002d; color:#fff; display: flex; align-items: center; justify-content: center; font-weight: 700;">A</div>
+          <div>
+            <div style="font-weight: 600; font-size: 14px; color:var(--yt-text);">Aevy TV ✓</div>
+            <div style="font-size: 12px; color: #888;">1.4M subscribers</div>
+          </div>
+        </div>
+        <button style="background: #0f0f0f; color: #fff; border: none; padding: 8px 18px; border-radius: 18px; font-weight: 600; font-size: 13px; cursor: pointer;">
+          Subscribe
+        </button>
+      </div>
+
+      <div class="yt-mock-desc">
+        <strong>1,012,595 views • Oct 15, 2026</strong><br><br>
+        We spent 10 days travelling across Germany investigating why Europe's biggest economy is opening its doors to Indian talent. Inside Germany we found a small Indian community that's thriving and right beside it, Indians who are struggling.
+      </div>
+    </section>
+
+    <!-- Right Column: Embedded Extractor + Recommended Videos Flow -->
+    <aside class="yt-secondary-col">
+      
+      <!-- Embedded Extractor Prototype Frame -->
+      <div class="prototype-frame-container">
+        <iframe class="prototype-frame" id="protoFrame" src="prototype-7-youtube-sidebar-native.html"></iframe>
+      </div>
+
+      <!-- YouTube Recommended Videos Appearing Underneath Extractor -->
+      <div class="yt-rec-header">Recommended Videos (Flow Underneath)</div>
+
+      <div class="yt-rec-card">
+        <div class="rec-thumb">Thumbnail</div>
+        <div class="rec-info">
+          <div class="rec-title">Tommy Mello's $300M Company Gets More Leads From Google Maps</div>
+          <div class="rec-channel">Noah Igler • 11K views</div>
+        </div>
+      </div>
+
+      <div class="yt-rec-card">
+        <div class="rec-thumb">Thumbnail</div>
+        <div class="rec-info">
+          <div class="rec-title">Anthropic is Preparing for Mass Unemployment</div>
+          <div class="rec-channel">In the Loop AI • 29K views</div>
+        </div>
+      </div>
+
+      <div class="yt-rec-card">
+        <div class="rec-thumb">Thumbnail</div>
+        <div class="rec-info">
+          <div class="rec-title">How Europe's Economy is Changing in 2026</div>
+          <div class="rec-channel">Tech Compass • 154K views</div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll('.design-tab');
+    const frame = document.getElementById('protoFrame');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        frame.src = tab.getAttribute('data-src');
+      });
+    });
+
+    themeToggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('light-theme');
+      const isLight = document.body.classList.contains('light-theme');
+      themeToggleBtn.textContent = isLight ? '🌙 Toggle Dark Background' : '☀️ Toggle Light Background';
+    });
+  </script>
+</body>
+</html>

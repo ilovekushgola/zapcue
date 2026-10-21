@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Native Sidebar Component (Drawer Layout)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --yt-bg: #0f0f0f;
+      --yt-card-bg: #272727;
+      --yt-card-hover: #323232;
+      --yt-text-primary: #f1f1f1;
+      --yt-text-secondary: #aaaaaa;
+      --yt-accent-blue: #3ea6ff;
+      --yt-btn-primary-bg: #f1f1f1;
+      --yt-btn-primary-text: #0f0f0f;
+      --yt-btn-secondary-bg: rgba(255, 255, 255, 0.1);
+      --yt-btn-secondary-hover: rgba(255, 255, 255, 0.2);
+      --yt-border: #383838;
+      --yt-radius-card: 12px;
+      --yt-radius-pill: 18px;
+    }
+
+    [data-theme="light"] {
+      --yt-bg: #ffffff;
+      --yt-card-bg: #f2f2f2;
+      --yt-card-hover: #e8e8e8;
+      --yt-text-primary: #0f0f0f;
+      --yt-text-secondary: #606060;
+      --yt-accent-blue: #065fd4;
+      --yt-btn-primary-bg: #0f0f0f;
+      --yt-btn-primary-text: #ffffff;
+      --yt-btn-secondary-bg: rgba(0, 0, 0, 0.05);
+      --yt-btn-secondary-hover: rgba(0, 0, 0, 0.1);
+      --yt-border: #e5e5e5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #050505;
+      color: var(--yt-text-primary);
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Outer Wrapper simulating YouTube's Secondary Column */
+    .yt-drawer-wrapper {
+      width: 410px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Top Utility Bar for Prototype (Theme & reset) */
+    .proto-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px;
+      font-size: 12px;
+      color: var(--yt-text-secondary);
+    }
+    .proto-badge {
+      background: #e1002d;
+      color: #fff;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--yt-border);
+      color: var(--yt-text-primary);
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    /* Main Container — Exact Native YouTube Panel */
+    .yt-native-panel {
+      background: var(--yt-bg);
+      border-radius: var(--yt-radius-card);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    /* 1. Header: Title + Close Button */
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .video-title {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--yt-text-primary);
+      flex: 1;
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: var(--yt-text-primary);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s ease;
+    }
+    .btn-close:hover {
+      background: var(--yt-btn-secondary-bg);
+    }
+
+    /* 2. Channel Row with Circular Logo */
+    .channel-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .channel-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .channel-avatar svg,
+    .channel-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .channel-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .channel-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--yt-text-primary);
+    }
+
+    /* 3. Three-Column Stats Row (Likes, Views, Date) */
+    .stats-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 4px 0;
+    }
+
+    .stat-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      flex: 1;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--yt-text-primary);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--yt-text-secondary);
+      font-weight: 400;
+    }
+
+    /* 4. Description Card */
+    .desc-card {
+      background: var(--yt-card-bg);
+      border-radius: var(--yt-radius-card);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: background 0.15s ease;
+    }
+
+    .desc-text {
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--yt-text-primary);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .desc-text p {
+      margin: 0;
+    }
+
+    .desc-hashtags {
+      color: var(--yt-accent-blue);
+      font-size: 13px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .desc-collapsible {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .desc-collapsible.expanded {
+      display: flex;
+    }
+
+    .btn-show-toggle {
+      background: transparent;
+      border: none;
+      color: var(--yt-text-primary);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      padding: 2px 0;
+      display: inline-block;
+      width: fit-content;
+    }
+    .btn-show-toggle:hover {
+      text-decoration: underline;
+    }
+
+    /* 5. Transcript Section (DIRECTLY UNDER DESCRIPTION) */
+    .transcript-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    /* Section Top Bar: Title + Copy & Export Buttons */
+    .transcript-top-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .transcript-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .transcript-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--yt-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 500;
+      background: rgba(62, 166, 255, 0.15);
+      color: var(--yt-accent-blue);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    /* Action Buttons (ON TOP OF TRANSCRIPT SECTION) */
+    .action-buttons-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Single Copy Button */
+    .btn-copy {
+      flex: 1;
+      height: 38px;
+      background: var(--yt-card-bg);
+      color: var(--yt-text-primary);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-copy:hover {
+      background: var(--yt-card-hover);
+    }
+
+    /* Split Export Button */
+    .split-export {
+      flex: 1;
+      display: flex;
+      height: 38px;
+      position: relative;
+    }
+
+    .btn-export-main {
+      flex: 1;
+      background: var(--yt-btn-primary-bg);
+      color: var(--yt-btn-primary-text);
+      border: none;
+      border-top-left-radius: var(--yt-radius-pill);
+      border-bottom-left-radius: var(--yt-radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 0 12px;
+      transition: opacity 0.15s ease;
+    }
+    .btn-export-main:hover {
+      opacity: 0.9;
+    }
+
+    .btn-export-caret {
+      background: var(--yt-btn-primary-bg);
+      color: var(--yt-btn-primary-text);
+      border: none;
+      border-left: 1px solid rgba(0, 0, 0, 0.15);
+      border-top-right-radius: var(--yt-radius-pill);
+      border-bottom-right-radius: var(--yt-radius-pill);
+      padding: 0 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s ease;
+    }
+    [data-theme="dark"] .btn-export-caret {
+      border-left: 1px solid rgba(0, 0, 0, 0.25);
+    }
+    .btn-export-caret:hover {
+      opacity: 0.9;
+    }
+
+    /* Export Dropdown */
+    .export-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 175px;
+      background: var(--yt-card-bg);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-card);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      padding: 4px 0;
+      display: none;
+      z-index: 100;
+    }
+    .export-dropdown.show {
+      display: block;
+    }
+
+    .dropdown-opt {
+      width: 100%;
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      color: var(--yt-text-primary);
+      font-size: 12.5px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .dropdown-opt:hover {
+      background: var(--yt-card-hover);
+      color: var(--yt-accent-blue);
+    }
+    .opt-tag {
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(62, 166, 255, 0.2);
+      color: var(--yt-accent-blue);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    /* 6. Controls Bar: Timestamp Toggle & Search */
+    .transcript-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 2px 0;
+    }
+
+    /* Timestamp Toggle Switch */
+    .timestamp-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--yt-text-secondary);
+      user-select: none;
+    }
+
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 18px;
+    }
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #555;
+      transition: 0.2s ease;
+      border-radius: 18px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: 0.2s ease;
+      border-radius: 50%;
+    }
+    input:checked + .switch-slider {
+      background-color: var(--yt-accent-blue);
+    }
+    input:checked + .switch-slider:before {
+      transform: translateX(16px);
+    }
+
+    /* Search Input */
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 180px;
+    }
+    .search-input {
+      width: 100%;
+      height: 30px;
+      padding: 0 10px 0 26px;
+      background: var(--yt-card-bg);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius-pill);
+      font-size: 12px;
+      color: var(--yt-text-primary);
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .search-input:focus {
+      border-color: var(--yt-accent-blue);
+    }
+    .search-icon {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--yt-text-secondary);
+      pointer-events: none;
+    }
+
+    /* 7. Transcript Body Box (Scrollable Card) */
+    .transcript-card {
+      background: var(--yt-card-bg);
+      border-radius: var(--yt-radius-card);
+      padding: 12px 14px;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 1px solid transparent;
+    }
+    .transcript-card::-webkit-scrollbar {
+      width: 6px;
+    }
+    .transcript-card::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 3px;
+    }
+
+    /* Mode A: With Timestamps */
+    .segment-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .segment-row:hover {
+      background: var(--yt-card-hover);
+    }
+
+    .time-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--yt-accent-blue);
+      background: rgba(62, 166, 255, 0.12);
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      letter-spacing: 0.3px;
+    }
+    .segment-row:hover .time-badge {
+      background: var(--yt-accent-blue);
+      color: #ffffff;
+    }
+
+    .segment-text {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--yt-text-primary);
+      flex: 1;
+    }
+
+    /* Mode B: Without Timestamps (Continuous Flow / Paragraphs) */
+    .paragraph-view {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 4px 6px;
+    }
+
+    .paragraph-text {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--yt-text-primary);
+    }
+
+    /* Meta Count Info */
+    .transcript-meta-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--yt-text-secondary);
+      padding: 2px 4px;
+    }
+
+    /* Toast Notification */
+    .toast-popup {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #212121;
+      color: #ffffff;
+      border: 1px solid #444;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 18px;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      display: none;
+      z-index: 200;
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <div class="yt-drawer-wrapper">
+
+    <!-- Prototype Utility Bar -->
+    <div class="proto-bar">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="proto-badge">PROTOTYPE 7</span>
+        <span>Exact YouTube Drawer Spec</span>
+      </div>
+      <button class="theme-toggle" id="themeBtn">☀️ Switch to Light</button>
+    </div>
+
+    <!-- Main Native YouTube Component -->
+    <div class="yt-native-panel">
+
+      <!-- 1. Header: Video Title + Close Button -->
+      <div class="panel-header">
+        <h2 class="video-title">China's AX8860 AI Chip vs NVIDIA DGX Spark</h2>
+        <button class="btn-close" id="closeBtn" title="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- 2. Channel Row with Channel Logo (Avatar) -->
+      <div class="channel-row">
+        <div class="channel-avatar">
+          <!-- Stylized RedSwitches 'R' Vector Avatar matching screenshot -->
+          <svg viewBox="0 0 100 100" width="36" height="36">
+            <rect width="100" height="100" fill="#000000"/>
+            <path d="M 28 24 L 54 24 C 68 24 76 32 76 42 C 76 52 68 59 54 59 L 44 59 L 44 76 L 28 76 Z M 44 45 L 52 45 C 57 45 60 43 60 42 C 60 40 57 38 52 38 L 44 38 Z" fill="#ffffff"/>
+            <polygon points="56,58 74,76 56,76 46,65" fill="#ffffff"/>
+          </svg>
+        </div>
+        <div class="channel-info">
+          <div class="channel-name">RedSwitches</div>
+        </div>
+      </div>
+
+      <!-- 3. Stats Row (484 Likes • 31K Views • Oct 20 2026) -->
+      <div class="stats-row">
+        <div class="stat-col">
+          <span class="stat-value">484</span>
+          <span class="stat-label">Likes</span>
+        </div>
+        <div class="stat-col">
+          <span class="stat-value">31K</span>
+          <span class="stat-label">Views</span>
+        </div>
+        <div class="stat-col">
+          <span class="stat-value">Oct 20</span>
+          <span class="stat-label">2026</span>
+        </div>
+      </div>
+
+      <!-- 4. Description Card (Exact content from screenshot) -->
+      <div class="desc-card">
+        <div class="desc-text">
+          <p>Can China's new AI chip challenge NVIDIA?</p>
+          <p>The Axera AX8860 is making headlines after hardware maker Sspeed claimed it delivered a 25% speed advantage over NVIDIA's DGX Spark in one Qwen AI model test.</p>
+          
+          <div class="desc-collapsible" id="descCollapsible">
+            <p>With support for up to 128GB of memory and AI server hardware already demonstrated, the AX8860 could become an interesting contender in the local AI market.</p>
+            <p>But is this enough to beat NVIDIA? Not so fast. One benchmark doesn't tell the whole story.</p>
+            <p>Watch to discover what makes this Chinese AI chip worth paying attention to.</p>
+            <p>Follow RedSwitches for more AI, data center, and tech industry updates.</p>
+            
+            <div class="desc-hashtags">
+              #AxeraAX8860 #NVIDIA #DGXSpark #AIChips #ArtificialIntelligence #TechNews #QwenAI
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-show-toggle" id="showToggleBtn">...more</button>
+      </div>
+
+      <!-- 5. Transcript Section (DIRECTLY UNDER DESCRIPTION) -->
+      <div class="transcript-section">
+        
+        <!-- Section Top Bar: Title & Status -->
+        <div class="transcript-top-bar">
+          <div class="transcript-header-row">
+            <div class="transcript-title">
+              <span>Transcript</span>
+              <span class="status-badge">Auto-extracted</span>
+            </div>
+            <div class="transcript-meta-info" id="wordCountLabel">
+              6 segments • 1,120 words
+            </div>
+          </div>
+
+          <!-- Action Buttons on Top of Transcript Section -->
+          <div class="action-buttons-row">
+            <!-- Single Copy Button -->
+            <button class="btn-copy" id="btnCopy" title="Copy transcript to clipboard">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span id="copyBtnText">Copy</span>
+            </button>
+
+            <!-- Split Export Button -->
+            <div class="split-export">
+              <button class="btn-export-main" id="btnExportMain" title="Export as Markdown (.md)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Export</span>
+              </button>
+              <button class="btn-export-caret" id="btnExportCaret" title="Select format">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+
+              <!-- Dropdown -->
+              <div class="export-dropdown" id="exportDropdown">
+                <button class="dropdown-opt" data-fmt="md">
+                  <span>Markdown (.md)</span>
+                  <span class="opt-tag">DEFAULT</span>
+                </button>
+                <button class="dropdown-opt" data-fmt="json">
+                  <span>JSON (.json)</span>
+                </button>
+                <button class="dropdown-opt" data-fmt="txt">
+                  <span>Plain Text (.txt)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controls: Timestamp Toggle & Search Filter -->
+          <div class="transcript-toolbar">
+            <!-- Timestamp Toggle (With vs Without Timestamps) -->
+            <div class="timestamp-toggle-wrap">
+              <label class="switch-toggle">
+                <input type="checkbox" id="timestampToggle" checked>
+                <span class="switch-slider"></span>
+              </label>
+              <span id="timestampStatusLabel">Timestamps: <strong>ON</strong></span>
+            </div>
+
+            <!-- Instant Search -->
+            <div class="search-wrap">
+              <svg class="search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="search-input" id="searchInput" placeholder="Search transcript...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable Transcript Content Container -->
+        <div class="transcript-card" id="transcriptContainer">
+          <!-- Segments will be rendered here dynamically based on Timestamp Toggle -->
+        </div>
+
+      </div>
+
+      <!-- Toast Popup -->
+      <div class="toast-popup" id="toast">Copied to clipboard!</div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Data from Video & Screenshot
+    const transcriptData = [
+      { timestamp: "00:00", seconds: 0, text: "Can China's new artificial intelligence chip genuinely challenge NVIDIA's dominance in the server market?" },
+      { timestamp: "00:45", seconds: 45, text: "The Axera AX8860 has been making major headlines worldwide after hardware maker Sspeed claimed it delivered a 25% speed advantage." },
+      { timestamp: "01:28", seconds: 88, text: "Specifically in one Qwen AI model benchmark, the raw inference throughput showed surprising efficiency compared to the DGX Spark." },
+      { timestamp: "02:15", seconds: 135, text: "With architecture support for up to 128 gigabytes of unified memory and enterprise AI server hardware already in demonstration racks." },
+      { timestamp: "03:10", seconds: 190, text: "However, one isolated synthetic benchmark does not tell the whole architectural story regarding CUDA software ecosystem dominance." },
+      { timestamp: "04:30", seconds: 270, text: "In this breakdown, we examine memory bandwidth, compute efficiency, and what the AX8860 actually means for the global AI landscape." }
+    ];
+
+    let showTimestamps = true;
+    let searchQuery = '';
+
+    const container = document.getElementById('transcriptContainer');
+    const toggle = document.getElementById('timestampToggle');
+    const toggleLabel = document.getElementById('timestampStatusLabel');
+    const searchInput = document.getElementById('searchInput');
+    const toast = document.getElementById('toast');
+
+    function renderTranscript() {
+      const q = searchQuery.toLowerCase().trim();
+      const filtered = transcriptData.filter(item => !q || item.text.toLowerCase().includes(q));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--yt-text-secondary); font-size:13px;">No matching transcript lines found.</div>`;
+        return;
+      }
+
+      if (showTimestamps) {
+        // Mode A: With Timestamps (clickable pills + segment text)
+        container.innerHTML = filtered.map(item => `
+          <div class="segment-row" onclick="jumpToTime('${item.timestamp}')">
+            <span class="time-badge">${item.timestamp}</span>
+            <span class="segment-text">${escapeHtml(item.text)}</span>
+          </div>
+        `).join('');
+      } else {
+        // Mode B: Without Timestamps (Continuous clean paragraph reading mode)
+        container.innerHTML = `
+          <div class="paragraph-view">
+            ${filtered.map(item => `
+              <p class="paragraph-text">${escapeHtml(item.text)}</p>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2200);
+    }
+
+    function jumpToTime(t) {
+      showToast(`▶ Seeking video player to ${t}`);
+    }
+
+    // Toggle Timestamps ON / OFF
+    toggle.addEventListener('change', (e) => {
+      showTimestamps = e.target.checked;
+      toggleLabel.innerHTML = showTimestamps 
+        ? 'Timestamps: <strong>ON</strong>' 
+        : 'Timestamps: <strong>OFF</strong>';
+      renderTranscript();
+      showToast(showTimestamps ? '✓ Timestamps enabled' : '✓ Continuous reading mode (No timestamps)');
+    });
+
+    // Search Filtering
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      renderTranscript();
+    });
+
+    // Show More / Show Less Collapsible in Description Card
+    const showToggleBtn = document.getElementById('showToggleBtn');
+    const descCollapsible = document.getElementById('descCollapsible');
+    let isExpanded = false;
+
+    showToggleBtn.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      if (isExpanded) {
+        descCollapsible.classList.add('expanded');
+        showToggleBtn.textContent = 'Show less';
+      } else {
+        descCollapsible.classList.remove('expanded');
+        showToggleBtn.textContent = '...more';
+      }
+    });
+
+    // Helper to generate full bundle text (Metadata + Description + Transcript)
+    function generateFullBundle(withTimestamps) {
+      const transcriptBody = withTimestamps
+        ? transcriptData.map(i => `[${i.timestamp}] ${i.text}`).join('\n')
+        : transcriptData.map(i => i.text).join('\n\n');
+
+      return [
+        '======================================================================',
+        'TITLE:       China\'s AX8860 AI Chip vs NVIDIA DGX Spark',
+        'CHANNEL:     RedSwitches',
+        'VIEWS:       31,000 views (31K)',
+        'LIKES:       484',
+        'DURATION:    24:35',
+        'PUBLISHED:   2026-10-20',
+        'URL:         https://www.youtube.com/watch?v=mock_video_id',
+        'EXTRACTED:   ' + new Date().toISOString(),
+        '======================================================================',
+        '',
+        '--- DESCRIPTION ---',
+        'Can China\'s new AI chip challenge NVIDIA?\n\nThe Axera AX8860 is making headlines after hardware maker Sspeed claimed it delivered a 25% speed advantage over NVIDIA\'s DGX Spark in one Qwen AI model test.',
+        '',
+        '--- TRANSCRIPT ---',
+        transcriptBody
+      ].join('\n');
+    }
+
+    function downloadPrototypeFile(filename, content, mime) {
+      const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    // Copy Button (Copies ALL Metadata + Description + Transcript)
+    document.getElementById('btnCopy').addEventListener('click', () => {
+      const fullText = generateFullBundle(showTimestamps);
+      navigator.clipboard?.writeText(fullText);
+      showToast(showTimestamps ? '✓ Copied All Metadata & Timestamps!' : '✓ Copied All Metadata & Clean Text!');
+    });
+
+    // Split Export Dropdown
+    const exportCaret = document.getElementById('btnExportCaret');
+    const exportDropdown = document.getElementById('exportDropdown');
+    const exportMain = document.getElementById('btnExportMain');
+
+    exportCaret.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportDropdown.classList.toggle('show');
+    });
+
+    document.addEventListener('click', () => {
+      exportDropdown.classList.remove('show');
+    });
+
+    exportMain.addEventListener('click', () => {
+      const md = `# China's AX8860 AI Chip vs NVIDIA DGX Spark\n\n## Video Information\n- **Channel:** RedSwitches\n- **Views:** 31K\n- **Likes:** 484\n\n---\n\n## Transcript\n` +
+        (showTimestamps ? transcriptData.map(i => `- **[${i.timestamp}]** ${i.text}`).join('\n') : transcriptData.map(i => i.text).join('\n\n'));
+      downloadPrototypeFile("Chinas_AX8860_AI_Chip.md", md, "text/markdown");
+      showToast('✓ Downloading Markdown (.md)');
+    });
+
+    exportDropdown.querySelectorAll('.dropdown-opt').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fmt = opt.getAttribute('data-fmt');
+        const filename = "Chinas_AX8860_AI_Chip." + fmt;
+        if (fmt === 'json') {
+          const json = JSON.stringify({
+            title: "China's AX8860 AI Chip vs NVIDIA DGX Spark",
+            channel: "RedSwitches",
+            views: 31000,
+            likes: 484,
+            transcript: transcriptData
+          }, null, 2);
+          downloadPrototypeFile(filename, json, "application/json");
+        } else if (fmt === 'txt') {
+          downloadPrototypeFile(filename, generateFullBundle(showTimestamps), "text/plain");
+        } else {
+          const md = `# China's AX8860 AI Chip vs NVIDIA DGX Spark\n\n## Video Information\n- **Channel:** RedSwitches\n- **Views:** 31K\n- **Likes:** 484\n\n---\n\n## Transcript\n` +
+            (showTimestamps ? transcriptData.map(i => `- **[${i.timestamp}]** ${i.text}`).join('\n') : transcriptData.map(i => i.text).join('\n\n'));
+          downloadPrototypeFile(filename, md, "text/markdown");
+        }
+        showToast(`✓ Downloading ${fmt.toUpperCase()} file`);
+        exportDropdown.classList.remove('show');
+      });
+    });
+
+    // Theme Switcher for Prototype Testing
+    const themeBtn = document.getElementById('themeBtn');
+    themeBtn.addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', next);
+      themeBtn.textContent = next === 'dark' ? '☀️ Switch to Light' : '🌙 Switch to Dark';
+    });
+
+    // Initial render
+    renderTranscript();
+  </script>
+</body>
+</html>

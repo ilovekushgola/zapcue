@@ -1,0 +1,645 @@
+/* YouTube Native Component (Drawer Layout) Styles */
+
+:host {
+  all: initial;
+  display: block;
+  width: 100%;
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  margin-bottom: 16px;
+
+  /* YouTube Dark Theme (Default) */
+  --yt-bg: #0f0f0f;
+  --yt-card-bg: #272727;
+  --yt-card-hover: #323232;
+  --yt-text-primary: #f1f1f1;
+  --yt-text-secondary: #aaaaaa;
+  --yt-accent-blue: #3ea6ff;
+  --yt-btn-primary-bg: #f1f1f1;
+  --yt-btn-primary-text: #0f0f0f;
+  --yt-btn-secondary-bg: rgba(255, 255, 255, 0.1);
+  --yt-btn-secondary-hover: rgba(255, 255, 255, 0.2);
+  --yt-border: #383838;
+  --yt-radius-card: 12px;
+  --yt-radius-pill: 18px;
+}
+
+:host([data-theme="light"]) {
+  /* YouTube Light Theme */
+  --yt-bg: #ffffff;
+  --yt-card-bg: #f2f2f2;
+  --yt-card-hover: #e8e8e8;
+  --yt-text-primary: #0f0f0f;
+  --yt-text-secondary: #606060;
+  --yt-accent-blue: #065fd4;
+  --yt-btn-primary-bg: #0f0f0f;
+  --yt-btn-primary-text: #ffffff;
+  --yt-btn-secondary-bg: rgba(0, 0, 0, 0.05);
+  --yt-btn-secondary-hover: rgba(0, 0, 0, 0.1);
+  --yt-border: #e5e5e5;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  pointer-events: auto;
+}
+
+/* Collapsed/Minimized Pill Bar */
+.minimized-pill {
+  width: 100%;
+  background: var(--yt-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: var(--yt-radius-card);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--yt-text-primary);
+  transition: background 0.15s ease;
+}
+
+.minimized-pill:hover {
+  background: var(--yt-card-bg);
+}
+
+.minimized-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.minimized-hint {
+  font-size: 11px;
+  color: var(--yt-accent-blue);
+  font-weight: 600;
+}
+
+/* Master Embedded Panel */
+.yt-native-panel {
+  width: 100%;
+  background: var(--yt-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: var(--yt-radius-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--yt-text-primary);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 1. Header: Video Title + Close Button */
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.video-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--yt-text-primary);
+  flex: 1;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: var(--yt-text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.btn-close:hover {
+  background: var(--yt-btn-secondary-bg);
+}
+
+/* 2. Channel Row with Channel Logo (Avatar) */
+.channel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.channel-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.channel-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.channel-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--yt-text-primary);
+}
+
+/* 3. Three-Column Stats Row (Likes, Views, Date) */
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 4px 0;
+}
+
+.stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--yt-text-primary);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--yt-text-secondary);
+  font-weight: 400;
+}
+
+/* 4. Description Card */
+.desc-card {
+  background: var(--yt-card-bg);
+  border-radius: var(--yt-radius-card);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: background 0.15s ease;
+}
+
+.desc-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--yt-text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  word-break: break-word;
+}
+
+.desc-text p {
+  margin: 0;
+}
+
+.desc-hashtags {
+  color: var(--yt-accent-blue);
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.desc-collapsible {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.desc-collapsible.expanded {
+  display: flex;
+}
+
+.btn-show-toggle {
+  background: transparent;
+  border: none;
+  color: var(--yt-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  padding: 2px 0;
+  display: inline-block;
+  width: fit-content;
+}
+
+.btn-show-toggle:hover {
+  text-decoration: underline;
+}
+
+/* 5. Transcript Section (DIRECTLY UNDER DESCRIPTION) */
+.transcript-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Section Top Bar: Title + Copy & Export Buttons */
+.transcript-top-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transcript-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.transcript-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--yt-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(62, 166, 255, 0.15);
+  color: var(--yt-accent-blue);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+/* Action Buttons (ON TOP OF TRANSCRIPT SECTION) */
+.action-buttons-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  position: relative;
+}
+
+/* Single Copy Button */
+.btn-copy {
+  flex: 1;
+  height: 38px;
+  background: var(--yt-card-bg);
+  color: var(--yt-text-primary);
+  border: 1px solid var(--yt-border);
+  border-radius: var(--yt-radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-copy:hover {
+  background: var(--yt-card-hover);
+}
+
+/* Split Export Button */
+.split-export {
+  flex: 1;
+  display: flex;
+  height: 38px;
+  position: relative;
+}
+
+.btn-export-main {
+  flex: 1;
+  background: var(--yt-btn-primary-bg);
+  color: var(--yt-btn-primary-text);
+  border: none;
+  border-top-left-radius: var(--yt-radius-pill);
+  border-bottom-left-radius: var(--yt-radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0 12px;
+  transition: opacity 0.15s ease;
+}
+
+.btn-export-main:hover {
+  opacity: 0.9;
+}
+
+.btn-export-caret {
+  background: var(--yt-btn-primary-bg);
+  color: var(--yt-btn-primary-text);
+  border: none;
+  border-left: 1px solid rgba(0, 0, 0, 0.15);
+  border-top-right-radius: var(--yt-radius-pill);
+  border-bottom-right-radius: var(--yt-radius-pill);
+  padding: 0 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease;
+}
+
+:host(:not([data-theme="light"])) .btn-export-caret {
+  border-left: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.btn-export-caret:hover {
+  opacity: 0.9;
+}
+
+/* Export Dropdown */
+.export-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 175px;
+  background: var(--yt-card-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: var(--yt-radius-card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 4px 0;
+  display: none;
+  z-index: 100;
+}
+
+.export-dropdown.show {
+  display: block;
+}
+
+.dropdown-opt {
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--yt-text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.dropdown-opt:hover {
+  background: var(--yt-card-hover);
+  color: var(--yt-accent-blue);
+}
+
+.opt-tag {
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(62, 166, 255, 0.2);
+  color: var(--yt-accent-blue);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* 6. Controls Bar: Timestamp Toggle & Search */
+.transcript-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+/* Timestamp Toggle Switch */
+.timestamp-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--yt-text-secondary);
+  user-select: none;
+}
+
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+}
+
+.switch-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #555;
+  transition: 0.2s ease;
+  border-radius: 18px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.2s ease;
+  border-radius: 50%;
+}
+
+input:checked + .switch-slider {
+  background-color: var(--yt-accent-blue);
+}
+
+input:checked + .switch-slider:before {
+  transform: translateX(16px);
+}
+
+/* Search Input */
+.search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 180px;
+}
+
+.search-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px 0 26px;
+  background: var(--yt-card-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: var(--yt-radius-pill);
+  font-size: 12px;
+  color: var(--yt-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.search-input:focus {
+  border-color: var(--yt-accent-blue);
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--yt-text-secondary);
+  pointer-events: none;
+}
+
+/* 7. Transcript Body Box (Scrollable Card) */
+.transcript-card {
+  background: var(--yt-card-bg);
+  border-radius: var(--yt-radius-card);
+  padding: 12px 14px;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transcript-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.transcript-card::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+/* Loading & Empty State Box */
+.state-box {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--yt-text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--yt-accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Mode A: With Timestamps */
+.segment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.segment-row:hover {
+  background: var(--yt-card-hover);
+}
+
+.time-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yt-accent-blue);
+  background: rgba(62, 166, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+
+.segment-row:hover .time-badge {
+  background: var(--yt-accent-blue);
+  color: #ffffff;
+}
+
+.segment-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--yt-text-primary);
+  flex: 1;
+}
+
+/* Mode B: Without Timestamps (Continuous Flow / Paragraphs) */
+.paragraph-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 6px;
+}
+
+.paragraph-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--yt-text-primary);
+}
+
+/* Meta Count Info */
+.transcript-meta-info {
+  font-size: 11.5px;
+  color: var(--yt-text-secondary);
+}
+
+/* Toast Notification */
+.toast-popup {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #212121;
+  color: #ffffff;
+  border: 1px solid #444;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  display: none;
+  z-index: 200;
+  pointer-events: none;
+}

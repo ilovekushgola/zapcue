@@ -1,0 +1,24 @@
+{
+  "name": "yt-meta-extractor",
+  "version": "1.0.0",
+  "description": "Chrome Extension for instant YouTube video metadata and transcript extraction",
+  "author": "Lovekush Gola (https://github.com/ilovekushgola)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilovekushgola/yt-meta-extractor.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "tsc --noEmit && node scripts/build.js",
+    "test": "node tests/extractor.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.1"
+  }
+}

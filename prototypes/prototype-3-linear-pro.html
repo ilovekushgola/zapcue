@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design 3: Linear Tech Pro</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif; }
+    body { background-color: #030712; color: #f9fafb; padding: 24px; display: flex; justify-content: center; }
+
+    .panel-preview {
+      width: 400px;
+      background: #090d16;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Header */
+    .p-header {
+      padding: 12px 16px;
+      background: #0d121f;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .p-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+    .telemetry-badge {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 2px 7px;
+      border-radius: 12px;
+    }
+
+    /* Video Hero Strip */
+    .video-strip {
+      padding: 12px 16px;
+      background: #090d16;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .video-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    /* 3-Pill Telemetry Bar */
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .tele-card {
+      background: #111726;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 6px 8px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .tele-val { font-size: 12px; font-weight: 700; color: #f8fafc; }
+    .tele-lbl { font-size: 9.5px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+
+    /* Search Input */
+    .search-box {
+      padding: 8px 16px;
+      background: #0d121f;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #151c2e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 6px 12px;
+    }
+    .search-bar:focus-within { border-color: #38bdf8; }
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    /* Transcript Segment List */
+    .transcript-scroll {
+      height: 310px;
+      overflow-y: auto;
+      padding: 10px 14px;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .transcript-scroll::-webkit-scrollbar { width: 5px; }
+    .transcript-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+
+    .seg-card {
+      display: flex;
+      gap: 12px;
+      padding: 8px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .seg-card:hover {
+      background: #111726;
+    }
+    .seg-time {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      height: fit-content;
+      font-variant-numeric: tabular-nums;
+    }
+    .seg-text {
+      font-size: 13px;
+      line-height: 1.55;
+      color: #cbd5e1;
+      flex: 1;
+    }
+
+    /* Footer: Exactly 2 Buttons */
+    .p-footer {
+      padding: 12px 16px;
+      background: #0d121f;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    .btn-copy {
+      flex: 1;
+      background: #151c2e;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-copy:hover { background: #1e293b; border-color: rgba(255, 255, 255, 0.25); }
+
+    .split-btn {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+    .split-main {
+      flex: 1;
+      background: #38bdf8;
+      border: 1px solid #38bdf8;
+      color: #030712;
+      padding: 9px 12px;
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .split-main:hover { background: #0284c7; color: #fff; }
+    .split-caret {
+      background: #0284c7;
+      border: 1px solid #38bdf8;
+      border-left: 1px solid rgba(0,0,0,0.2);
+      color: #fff;
+      padding: 9px 10px;
+      border-top-right-radius: 8px;
+      border-bottom-right-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .split-caret:hover { background: #0369a1; }
+
+    .dropdown-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      width: 175px;
+      background: #111726;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 4px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      z-index: 100;
+    }
+    .dropdown-menu.show { display: flex; }
+    .menu-item {
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .menu-item:hover { background: #1e293b; color: #fff; }
+    .badge-default {
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0c4a6e;
+      border: 1px solid #38bdf8;
+      color: #bae6fd;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel-preview">
+    <!-- Header -->
+    <div class="p-header">
+      <div class="p-brand">
+        <span class="pulse-dot"></span>
+        <span>Transcript Pro</span>
+      </div>
+      <span class="telemetry-badge">⚡ 18ms Ready</span>
+    </div>
+
+    <!-- Video Hero Strip -->
+    <div class="video-strip">
+      <div class="video-title">We went to Germany to see if it is really Dying</div>
+      <div class="telemetry-row">
+        <div class="tele-card">
+          <span class="tele-val">1.01M</span>
+          <span class="tele-lbl">Views</span>
+        </div>
+        <div class="tele-card">
+          <span class="tele-val">12.4K</span>
+          <span class="tele-lbl">Likes</span>
+        </div>
+        <div class="tele-card">
+          <span class="tele-val">24:35</span>
+          <span class="tele-lbl">Duration</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-box">
+      <div class="search-bar">
+        <span style="color:#64748b; font-size:13px;">🔍</span>
+        <input type="text" class="search-input" placeholder="Search 3,420 words..." id="searchInput">
+      </div>
+    </div>
+
+    <!-- Transcript Scroll Area -->
+    <div class="transcript-scroll">
+      <div class="seg-card">
+        <span class="seg-time">0:44</span>
+        <span class="seg-text">was standing in the immigration line before entering Germany.</span>
+      </div>
+      <div class="seg-card">
+        <span class="seg-time">0:47</span>
+        <span class="seg-text">I'm next.</span>
+      </div>
+      <div class="seg-card">
+        <span class="seg-time">0:48</span>
+        <span class="seg-text">And I'm anxious, which makes no sense because I've done nothing wrong.</span>
+      </div>
+      <div class="seg-card">
+        <span class="seg-time">0:54</span>
+        <span class="seg-text">But still, I found myself rehearsing my own face so that I could look normal and get approval.</span>
+      </div>
+      <div class="seg-card">
+        <span class="seg-time">1:00</span>
+        <span class="seg-text">But then I realized that you don't say a common anxiety because you know how it is.</span>
+      </div>
+      <div class="seg-card">
+        <span class="seg-time">1:05</span>
+        <span class="seg-text">Inside Germany we found a small Indian community that's thriving and right beside it, Indians who are struggling.</span>
+      </div>
+    </div>
+
+    <!-- Footer: 2 Buttons -->
+    <div class="p-footer">
+      <button class="btn-copy" id="btnCopy">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span>Copy All</span>
+      </button>
+
+      <div class="split-btn">
+        <button class="split-main" id="btnExport">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export .md</span>
+        </button>
+        <button class="split-caret" id="btnCaret">▾</button>
+
+        <div class="dropdown-menu" id="exportMenu">
+          <button class="menu-item" id="optMd">
+            <span>Markdown (.md)</span>
+            <span class="badge-default">DEFAULT</span>
+          </button>
+          <button class="menu-item" id="optJson">
+            <span>JSON (.json)</span>
+          </button>
+          <button class="menu-item" id="optTxt">
+            <span>Plain Text (.txt)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="toast" id="toastBox">✓ Copied to clipboard!</div>
+    </div>
+  </div>
+
+  <script>
+    const btnCaret = document.getElementById('btnCaret');
+    const exportMenu = document.getElementById('exportMenu');
+    const toastBox = document.getElementById('toastBox');
+
+    btnCaret.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportMenu.classList.toggle('show');
+    });
+
+    document.addEventListener('click', () => {
+      exportMenu.classList.remove('show');
+    });
+
+    function showToast(msg) {
+      toastBox.textContent = '✓ ' + msg;
+      toastBox.style.display = 'block';
+      setTimeout(() => { toastBox.style.display = 'none'; }, 1800);
+    }
+
+    document.getElementById('btnCopy').addEventListener('click', () => showToast('Full text copied!'));
+    document.getElementById('btnExport').addEventListener('click', () => showToast('Markdown file exported!'));
+    document.getElementById('optMd').addEventListener('click', () => showToast('Markdown exported!'));
+    document.getElementById('optJson').addEventListener('click', () => showToast('JSON exported!'));
+    document.getElementById('optTxt').addEventListener('click', () => showToast('Plain text exported!'));
+  </script>
+</body>
+</html>

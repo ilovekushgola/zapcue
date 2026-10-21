@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design 2: Notion / Studio Reader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0d0e11; color: #f3f4f6; padding: 24px; display: flex; justify-content: center; }
+
+    .panel-preview {
+      width: 400px;
+      background: #141519;
+      border: 1px solid #23252c;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+    }
+
+    /* Header */
+    .p-header {
+      padding: 14px 16px;
+      background: #18191f;
+      border-bottom: 1px solid #23252c;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .p-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .badge-live {
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      padding: 2px 7px;
+      border-radius: 10px;
+      border: 1px solid rgba(74, 222, 128, 0.25);
+    }
+
+    /* View Mode Switcher (Timestamps vs Clean Article Prose) */
+    .view-mode-bar {
+      display: flex;
+      background: #101115;
+      padding: 8px 16px;
+      border-bottom: 1px solid #23252c;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mode-pills {
+      display: flex;
+      background: #1c1d24;
+      padding: 2px;
+      border-radius: 8px;
+      gap: 2px;
+    }
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mode-btn.active {
+      background: #2b2d38;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Video Hero Strip */
+    .video-strip {
+      padding: 12px 16px;
+      background: #141519;
+      border-bottom: 1px solid #23252c;
+    }
+    .video-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.45;
+      color: #f8fafc;
+      margin-bottom: 6px;
+    }
+    .meta-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tag {
+      font-size: 11px;
+      color: #94a3b8;
+      background: #1c1d24;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .tag.highlight {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.2);
+    }
+
+    /* Search */
+    .search-wrap {
+      padding: 8px 16px;
+      background: #101115;
+      border-bottom: 1px solid #23252c;
+    }
+    .search-inner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1a1b22;
+      border: 1px solid #2d303b;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    .search-inner:focus-within { border-color: #6366f1; }
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 12.5px;
+    }
+
+    /* Content Area */
+    .transcript-body {
+      height: 310px;
+      overflow-y: auto;
+      padding: 12px 16px;
+      background: #141519;
+    }
+    .transcript-body::-webkit-scrollbar { width: 5px; }
+    .transcript-body::-webkit-scrollbar-thumb { background: #2d303b; border-radius: 3px; }
+
+    /* Mode 1: Timestamp lines */
+    .t-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 8px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .t-row:hover { background: #1c1d24; }
+    .t-time {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #818cf8;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .t-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      flex: 1;
+    }
+
+    /* Mode 2: Continuous Prose / Story Reading */
+    .prose-view {
+      display: none;
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: #e2e8f0;
+      text-align: justify;
+    }
+    .prose-view p { margin-bottom: 14px; }
+
+    /* Footer: 2 Buttons */
+    .p-footer {
+      padding: 12px 16px;
+      background: #18191f;
+      border-top: 1px solid #23252c;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    .btn-copy {
+      flex: 1;
+      background: #23252e;
+      border: 1px solid #323542;
+      color: #f8fafc;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-copy:hover { background: #2d303b; transform: translateY(-1px); }
+
+    .split-btn {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+    .split-main {
+      flex: 1;
+      background: #6366f1;
+      border: 1px solid #6366f1;
+      color: #fff;
+      padding: 9px 12px;
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .split-main:hover { background: #4f46e5; }
+    .split-caret {
+      background: #4f46e5;
+      border: 1px solid #6366f1;
+      border-left: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 9px 10px;
+      border-top-right-radius: 8px;
+      border-bottom-right-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .split-caret:hover { background: #4338ca; }
+
+    .dropdown-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      width: 175px;
+      background: #1c1d24;
+      border: 1px solid #2d303b;
+      border-radius: 8px;
+      padding: 5px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      z-index: 100;
+    }
+    .dropdown-menu.show { display: flex; }
+    .menu-item {
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.12s ease;
+    }
+    .menu-item:hover { background: #2b2d38; color: #fff; }
+    .badge-default {
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e1b4b;
+      border: 1px solid #6366f1;
+      color: #c7d2fe;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel-preview">
+    <!-- Header -->
+    <div class="p-header">
+      <div class="p-brand">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Transcript Studio</span>
+      </div>
+      <span class="badge-live">● EXTRACTED</span>
+    </div>
+
+    <!-- Video Info Strip -->
+    <div class="video-strip">
+      <div class="video-title">We went to Germany to see if it is really Dying</div>
+      <div class="meta-tags">
+        <span class="tag">👤 Aevy TV</span>
+        <span class="tag highlight">👁 1.01M views</span>
+        <span class="tag">👍 12.4K</span>
+        <span class="tag">⏱ 24:35</span>
+      </div>
+    </div>
+
+    <!-- View Mode Switcher -->
+    <div class="view-mode-bar">
+      <span style="font-size: 11px; color:#64748b; font-weight:600;">READING VIEW</span>
+      <div class="mode-pills">
+        <button class="mode-btn active" id="btnModeTimestamps">Timestamps</button>
+        <button class="mode-btn" id="btnModeProse">Paragraphs</button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <div class="search-inner">
+        <span style="color:#64748b; font-size:13px;">🔍</span>
+        <input type="text" class="search-input" placeholder="Quick search..." id="searchInput">
+      </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="transcript-body">
+      <!-- Mode 1: Line by Line -->
+      <div id="linesView">
+        <div class="t-row">
+          <span class="t-time">00:44</span>
+          <span class="t-text">was standing in the immigration line before entering Germany.</span>
+        </div>
+        <div class="t-row">
+          <span class="t-time">00:47</span>
+          <span class="t-text">I'm next.</span>
+        </div>
+        <div class="t-row">
+          <span class="t-time">00:48</span>
+          <span class="t-text">And I'm anxious, which makes no sense because I've done nothing wrong.</span>
+        </div>
+        <div class="t-row">
+          <span class="t-time">00:54</span>
+          <span class="t-text">But still, I found myself rehearsing my own face so that I could look normal and get approval.</span>
+        </div>
+        <div class="t-row">
+          <span class="t-time">01:00</span>
+          <span class="t-text">But then I realized that you don't say a common anxiety because you know how it is.</span>
+        </div>
+        <div class="t-row">
+          <span class="t-time">01:05</span>
+          <span class="t-text">Inside Germany we found a small Indian community that's thriving and right beside it, Indians who are struggling.</span>
+        </div>
+      </div>
+
+      <!-- Mode 2: Continuous Paragraphs -->
+      <div class="prose-view" id="proseView">
+        <p>I was standing in the immigration line before entering Germany. I'm next, and I'm anxious, which makes no sense because I've done nothing wrong.</p>
+        <p>But still, I found myself rehearsing my own face so that I could look normal and get approval. But then I realized that you don't say a common anxiety because you know how it is.</p>
+        <p>Inside Germany we found a small Indian community that's thriving and right beside it, Indians who are struggling with language barriers, paperwork, and job placement.</p>
+      </div>
+    </div>
+
+    <!-- Footer: 2 Buttons -->
+    <div class="p-footer">
+      <button class="btn-copy" id="btnCopy">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span>Copy All</span>
+      </button>
+
+      <div class="split-btn">
+        <button class="split-main" id="btnExport">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export .md</span>
+        </button>
+        <button class="split-caret" id="btnCaret">▾</button>
+
+        <div class="dropdown-menu" id="exportMenu">
+          <button class="menu-item" id="optMd">
+            <span>Markdown (.md)</span>
+            <span class="badge-default">DEFAULT</span>
+          </button>
+          <button class="menu-item" id="optJson">
+            <span>JSON (.json)</span>
+          </button>
+          <button class="menu-item" id="optTxt">
+            <span>Plain Text (.txt)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="toast" id="toastBox">✓ Copied to clipboard!</div>
+    </div>
+  </div>
+
+  <script>
+    const btnModeTimestamps = document.getElementById('btnModeTimestamps');
+    const btnModeProse = document.getElementById('btnModeProse');
+    const linesView = document.getElementById('linesView');
+    const proseView = document.getElementById('proseView');
+
+    btnModeTimestamps.addEventListener('click', () => {
+      btnModeTimestamps.classList.add('active');
+      btnModeProse.classList.remove('active');
+      linesView.style.display = 'block';
+      proseView.style.display = 'none';
+    });
+
+    btnModeProse.addEventListener('click', () => {
+      btnModeProse.classList.add('active');
+      btnModeTimestamps.classList.remove('active');
+      linesView.style.display = 'none';
+      proseView.style.display = 'block';
+    });
+
+    const btnCaret = document.getElementById('btnCaret');
+    const exportMenu = document.getElementById('exportMenu');
+    const toastBox = document.getElementById('toastBox');
+
+    btnCaret.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportMenu.classList.toggle('show');
+    });
+
+    document.addEventListener('click', () => {
+      exportMenu.classList.remove('show');
+    });
+
+    function showToast(msg) {
+      toastBox.textContent = '✓ ' + msg;
+      toastBox.style.display = 'block';
+      setTimeout(() => { toastBox.style.display = 'none'; }, 1800);
+    }
+
+    document.getElementById('btnCopy').addEventListener('click', () => showToast('Full text copied!'));
+    document.getElementById('btnExport').addEventListener('click', () => showToast('Markdown file exported!'));
+    document.getElementById('optMd').addEventListener('click', () => showToast('Markdown exported!'));
+    document.getElementById('optJson').addEventListener('click', () => showToast('JSON exported!'));
+    document.getElementById('optTxt').addEventListener('click', () => showToast('Plain text exported!'));
+  </script>
+</body>
+</html>
