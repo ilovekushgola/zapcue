@@ -139,6 +139,14 @@ export interface UserPreferences {
   theme: 'dark' | 'light' | 'auto';
 }
 
+export interface ExportOptions {
+  withTimestamps?: boolean;
+  includeChapters?: boolean;
+  includeImages?: boolean;
+  includeComments?: boolean;
+  isCopyAction?: boolean;
+}
+
 export interface BridgeMessagePayload {
   videoId: string;
   playerResponse?: any;

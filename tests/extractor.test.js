@@ -896,9 +896,30 @@ it('gracefully degrades to top sort with truthful warning when newest is unsuppo
 });
 
 // ----------------------------------------------------------------------
-// Test Group 17: Markdown and Plain Text Serialization Hierarchy & Escaping
+// Test Group 17: Markdown Export (Visual, Structural, Safety & Exclusion)
 // ----------------------------------------------------------------------
-console.log('\n--- Group 17: Markdown & Plain Text Serialization Hierarchy ---');
+console.log('\n--- Group 17: Markdown Export (Visual, Structural, Safety & Exclusion) ---');
+
+function isSafeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return /^https?:\/\//i.test(url.trim());
+}
+
+function buildTimestampUrl(videoUrl, seconds) {
+  const cleanSeconds = Math.max(0, Math.floor(seconds));
+  try {
+    const urlObj = new URL(videoUrl);
+    if (urlObj.pathname.startsWith('/shorts/')) {
+      const shortId = urlObj.pathname.split('/')[2];
+      return `https://www.youtube.com/watch?v=${shortId}&t=${cleanSeconds}s`;
+    }
+    urlObj.searchParams.set('t', `${cleanSeconds}s`);
+    return urlObj.toString();
+  } catch {
+    const sep = videoUrl.includes('?') ? '&' : '?';
+    return `${videoUrl}${sep}t=${cleanSeconds}s`;
+  }
+}
 
 function escapeMarkdown(text) {
   if (!text) return '';
@@ -909,101 +930,858 @@ function escapeMarkdown(text) {
     .trim();
 }
 
-function mockToMarkdown(result) {
-  const m = result.metadata;
-  const ch = result.chapters;
-  const cm = result.comments;
-
-  let chaptersMd = '';
-  if (ch?.available && ch.items.length > 0) {
-    chaptersMd = `\n## Chapters (${ch.items.length} Detected)\n` +
-      ch.items.map(c => `| **[${c.startTimestamp}]** | ${c.formattedDuration || '-'} | ${escapeMarkdown(c.title)} |`).join('\n') + '\n';
-  }
-
-  let commentsMd = '';
-  if (cm?.available && cm.threads.length > 0) {
-    commentsMd = `\n## Comments (${cm.topLevelCount} Top-Level, ${cm.replyCount} Replies • ${cm.sortOrder === 'top' ? 'Top Comments' : 'Newest First'})\n\n`;
-    commentsMd += cm.threads.map((th, i) => {
-      let b = `### #${i + 1} — [${escapeMarkdown(th.author.displayName)}](${th.author.channelUrl || '#'})\n` +
-        `| **Comment ID** | \`${th.id}\` |\n` +
-        `| **Likes** | ❤️ ${th.likeCount || '0'} |\n` +
-        `| **Replies** | 💬 ${th.replyCount || 0} |\n\n` +
-        `> ${escapeMarkdown(th.text).replace(/\n/g, '\n> ')}\n`;
-
-      if (th.replies && th.replies.length > 0) {
-        b += `\n**Replies (${th.replies.length}):**\n\n`;
-        b += th.replies.map((r, rIdx) => {
-          return `> **↳ #${i + 1}.${rIdx + 1} ${escapeMarkdown(r.author.displayName)}** [ID: \`${r.id}\`]:\n` +
-            `> ${escapeMarkdown(r.text).replace(/\n/g, '\n> ')}\n`;
-        }).join('\n');
-      }
-      return b;
-    }).join('\n---\n\n');
-  }
-
-  const subsDisplay = m.subscriberInfo ? `${m.subscriberInfo.displayText} (${m.subscriberInfo.status})` : 'Unavailable';
-  const thumbLink = `[${escapeMarkdown(m.title)} - Thumbnail](${m.thumbnailUrl})`;
-  const avatarLink = m.channelAvatarUrl ? `[Channel Avatar](${m.channelAvatarUrl})` : 'Unavailable';
-
-  return `# ${m.title}\n\n` +
-    `| **Channel** | ${m.channelName} |\n` +
-    `| **Subscribers** | ${subsDisplay} |\n` +
-    `| **Thumbnail** | ${thumbLink} |\n` +
-    `| **Avatar** | ${avatarLink} |\n` +
-    chaptersMd + commentsMd;
+function escapeTableCell(text) {
+  if (!text) return '';
+  return escapeMarkdown(text)
+    .replace(/\|/g, '\\|')
+    .replace(/\n+/g, ' ')
+    .trim();
 }
 
-it('generates Markdown with subscriber status, thumbnail/avatar links, and nested comment hierarchy', () => {
-  const fullMock = {
-    metadata: {
-      title: 'Advanced AI Architectures <2026>',
-      channelName: 'DeepMind Dev',
-      thumbnailUrl: 'https://img.youtube.com/vi/abc/hqdefault.jpg',
-      channelAvatarUrl: 'https://yt.com/avatar.jpg',
-      subscriberInfo: { displayText: '1.5M subscribers', status: 'rounded' }
+function resolveExportOptions(optionsOrTimestamps, legacyIncludeComments) {
+  if (typeof optionsOrTimestamps === 'boolean') {
+    return {
+      withTimestamps: optionsOrTimestamps,
+      includeChapters: true,
+      includeImages: true,
+      includeComments: legacyIncludeComments !== undefined ? Boolean(legacyIncludeComments) : true,
+      isCopyAction: false
+    };
+  }
+  if (optionsOrTimestamps && typeof optionsOrTimestamps === 'object') {
+    return {
+      withTimestamps: optionsOrTimestamps.withTimestamps ?? true,
+      includeChapters: optionsOrTimestamps.includeChapters ?? true,
+      includeImages: optionsOrTimestamps.includeImages ?? true,
+      includeComments: optionsOrTimestamps.includeComments ?? true,
+      isCopyAction: Boolean(optionsOrTimestamps.isCopyAction)
+    };
+  }
+  return {
+    withTimestamps: true,
+    includeChapters: true,
+    includeImages: true,
+    includeComments: true,
+    isCopyAction: false
+  };
+}
+
+function normalizeExportData(result, options, format) {
+  const m = result.metadata;
+  const t = result.transcript;
+  const ch = result.chapters;
+  const cm = result.comments;
+  const videoUrl = m.url || `https://www.youtube.com/watch?v=${m.videoId}`;
+
+  const chaptersAvailable = Boolean(options.includeChapters && ch?.available && ch.items && ch.items.length > 0);
+  const chapterItems = (options.includeChapters && ch?.items ? ch.items : []).map((c) => ({
+    title: c.title,
+    startSeconds: c.startSeconds,
+    startTimestamp: c.startTimestamp,
+    endSeconds: c.endSeconds ?? null,
+    endTimestamp: c.endTimestamp ?? null,
+    durationSeconds: c.durationSeconds ?? null,
+    formattedDuration: c.formattedDuration ?? null,
+    source: c.source || 'description_timestamps',
+    url: buildTimestampUrl(videoUrl, c.startSeconds)
+  }));
+
+  const transcriptSegments = (t.segments || []).map((s) => ({
+    start: s.start,
+    duration: s.duration,
+    timestamp: s.timestamp,
+    text: s.text,
+    url: buildTimestampUrl(videoUrl, s.start)
+  }));
+
+  const commentsAvailable = Boolean(options.includeComments && cm?.available && cm.threads && cm.threads.length > 0);
+  const commentThreads = (options.includeComments && cm?.threads ? cm.threads : []).map((th) => ({
+    topLevelComment: {
+      id: th.id,
+      videoId: th.videoId || m.videoId,
+      text: th.text,
+      author: {
+        displayName: th.author.displayName || 'Anonymous',
+        channelUrl: isSafeUrl(th.author.channelUrl) ? th.author.channelUrl : null,
+        avatarUrl: isSafeUrl(th.author.avatarUrl) ? th.author.avatarUrl : null
+      },
+      publishedAt: th.publishedAt || null,
+      likeCount: th.likeCount || '0',
+      replyCount: th.replyCount !== undefined ? th.replyCount : (th.replies ? th.replies.length : 0),
+      isPinned: Boolean(th.isPinned),
+      isOwner: Boolean(th.isOwner)
+    },
+    replies: (th.replies || []).map((r) => ({
+      id: r.id,
+      parentCommentId: th.id,
+      videoId: r.videoId || th.videoId || m.videoId,
+      text: r.text,
+      author: {
+        displayName: r.author.displayName || 'Anonymous',
+        channelUrl: isSafeUrl(r.author.channelUrl) ? r.author.channelUrl : null,
+        avatarUrl: isSafeUrl(r.author.avatarUrl) ? r.author.avatarUrl : null
+      },
+      publishedAt: r.publishedAt || null,
+      likeCount: r.likeCount || '0',
+      replyCount: 0,
+      isPinned: Boolean(r.isPinned),
+      isOwner: Boolean(r.isOwner),
+      replies: []
+    }))
+  }));
+
+  const topLevelCount = options.includeComments ? (cm?.topLevelCount ?? commentThreads.length) : 0;
+  const replyCount = options.includeComments ? (cm?.replyCount ?? commentThreads.reduce((acc, th) => acc + th.replies.length, 0)) : 0;
+
+  return {
+    schemaVersion: 2,
+    extractedAt: result.extractedAt,
+    video: {
+      id: m.videoId,
+      url: videoUrl,
+      title: m.title,
+      isShort: Boolean(m.isShort),
+      channel: {
+        id: null,
+        name: m.channelName,
+        url: m.channelUrl || videoUrl,
+        avatarUrl: options.includeImages && isSafeUrl(m.channelAvatarUrl) ? m.channelAvatarUrl : null,
+        subscriberInfo: {
+          count: m.subscriberInfo?.count ?? null,
+          displayText: m.subscriberInfo?.displayText || 'Unavailable',
+          status: m.subscriberInfo?.status || 'unavailable'
+        }
+      },
+      stats: {
+        views: m.viewCount,
+        formattedViews: m.formattedViews,
+        likes: m.likeCount,
+        durationSeconds: m.durationSeconds,
+        formattedDuration: m.formattedDuration,
+        uploadDate: m.uploadDate
+      },
+      description: m.description || '',
+      images: {
+        thumbnailUrl: options.includeImages && isSafeUrl(m.thumbnailUrl) ? m.thumbnailUrl : null,
+        channelAvatarUrl: options.includeImages && isSafeUrl(m.channelAvatarUrl) ? m.channelAvatarUrl : null
+      }
     },
     chapters: {
-      available: true,
-      items: [
-        { title: 'Intro & Motivation', startTimestamp: '00:00', formattedDuration: '02:30' },
-        { title: 'Graph Transformers', startTimestamp: '02:30', formattedDuration: '05:00' }
-      ]
+      available: chaptersAvailable,
+      status: ch?.status ?? (ch?.available ? 'detected' : 'none_found'),
+      count: chapterItems.length,
+      items: chapterItems
+    },
+    transcript: {
+      available: Boolean(t.available && transcriptSegments.length > 0),
+      status: t.available ? 'complete' : (t.error ? 'failed' : 'unavailable'),
+      language: t.selectedLanguage || 'unknown',
+      wordCount: t.wordCount,
+      segmentCount: transcriptSegments.length,
+      segments: transcriptSegments
     },
     comments: {
-      available: true,
-      status: 'complete',
-      sortOrder: 'top',
-      topLevelCount: 1,
-      replyCount: 1,
-      threads: [
-        {
-          id: 'c_top_1',
-          text: 'Great video on <script>alert(1)</script> & KaTeX!',
-          author: { displayName: 'Alice', channelUrl: 'https://youtube.com/@alice' },
-          likeCount: '15',
-          replyCount: 1,
-          replies: [
-            {
-              id: 'r_sub_1',
-              parentCommentId: 'c_top_1',
-              text: 'Thanks Alice! More coming soon.',
-              author: { displayName: 'DeepMind Dev' },
-              likeCount: '3'
-            }
-          ]
-        }
-      ]
+      available: commentsAvailable,
+      status: cm?.status ?? 'not_requested',
+      sortOrder: cm?.sortOrder ?? 'top',
+      requestedLimit: cm?.requestedLimit ?? 0,
+      effectiveLimit: cm?.effectiveLimit ?? 0,
+      topLevelCount,
+      replyCount,
+      extractedCount: options.includeComments ? (cm?.extractedCount ?? (topLevelCount + replyCount)) : 0,
+      warning: cm?.warning || null,
+      reason: cm?.reason || null,
+      error: cm?.error || null,
+      threads: commentThreads
+    },
+    export: {
+      format,
+      timestampPreference: options.withTimestamps,
+      included: {
+        chapters: options.includeChapters,
+        comments: options.includeComments,
+        thumbnailUrl: options.includeImages && Boolean(m.thumbnailUrl),
+        channelAvatarUrl: options.includeImages && Boolean(m.channelAvatarUrl)
+      }
     }
   };
+}
 
-  const md = mockToMarkdown(fullMock);
-  assert.ok(md.includes('1.5M subscribers (rounded)'));
-  assert.ok(md.includes('[Advanced AI Architectures &lt;2026&gt; - Thumbnail](https://img.youtube.com/vi/abc/hqdefault.jpg)'));
-  assert.ok(md.includes('[Channel Avatar](https://yt.com/avatar.jpg)'));
-  assert.ok(md.includes('Graph Transformers'));
-  assert.ok(md.includes('| **Comment ID** | `c_top_1` |'));
+function toMarkdown(result, optionsOrTimestamps, legacyIncludeComments) {
+  const opts = resolveExportOptions(optionsOrTimestamps, legacyIncludeComments);
+  const data = normalizeExportData(result, opts, 'markdown');
+
+  const cleanTitle = escapeMarkdown(data.video.title);
+  const channelName = escapeMarkdown(data.video.channel.name);
+  const channelUrl = data.video.channel.url;
+  const videoUrl = data.video.url;
+
+  const sections = [`# ${cleanTitle}`];
+
+  if (opts.includeImages && data.video.images.thumbnailUrl) {
+    sections.push(`[![Video thumbnail: ${cleanTitle}](${data.video.images.thumbnailUrl})](${videoUrl})`);
+  } else if (!opts.includeImages) {
+    // Images omitted
+  } else {
+    sections.push('_Thumbnail unavailable._');
+  }
+
+  const subsDisplay = `${data.video.channel.subscriberInfo.displayText} (${data.video.channel.subscriberInfo.status})`;
+  let channelIdentity = `**[${channelName}](${channelUrl})** • ${subsDisplay}`;
+  if (opts.includeImages && data.video.images.channelAvatarUrl) {
+    channelIdentity = `[![${channelName} Avatar](${data.video.images.channelAvatarUrl})](${channelUrl}) ` + channelIdentity;
+  }
+  sections.push(channelIdentity);
+
+  const thumbCell = opts.includeImages && data.video.images.thumbnailUrl
+    ? `[Open thumbnail](${data.video.images.thumbnailUrl})`
+    : 'Unavailable';
+
+  const videoType = data.video.isShort ? 'YouTube Short' : 'Standard video';
+
+  sections.push(
+    `## Video Information\n\n` +
+    `| Field | Value |\n` +
+    `| :--- | :--- |\n` +
+    `| Channel | [${escapeTableCell(channelName)}](${channelUrl}) |\n` +
+    `| Subscribers | ${escapeTableCell(subsDisplay)} |\n` +
+    `| Views | ${escapeTableCell(data.video.stats.formattedViews)} |\n` +
+    `| Likes | ${escapeTableCell(data.video.stats.likes)} |\n` +
+    `| Duration | ${escapeTableCell(data.video.stats.formattedDuration)} |\n` +
+    `| Published | ${escapeTableCell(data.video.stats.uploadDate)} |\n` +
+    `| Video type | ${videoType} |\n` +
+    `| Video URL | [Watch on YouTube](${videoUrl}) |\n` +
+    `| Thumbnail | ${thumbCell} |`
+  );
+
+  const descBody = data.video.description
+    ? `> ${escapeMarkdown(data.video.description).replace(/\n/g, '\n> ')}`
+    : '_No description provided._';
+  sections.push(`## Description\n\n${descBody}`);
+
+  if (opts.includeChapters) {
+    if (data.chapters.available && data.chapters.items.length > 0) {
+      const chapterRows = data.chapters.items.map((c) => {
+        const dur = c.formattedDuration || '-';
+        return `| **[${c.startTimestamp}](${c.url})** | ${dur} | ${escapeTableCell(c.title)} |`;
+      }).join('\n');
+
+      sections.push(
+        `## Chapters (${data.chapters.items.length} Detected)\n\n` +
+        `| Timestamp | Duration | Chapter Title |\n` +
+        `| :--- | :--- | :--- |\n` +
+        chapterRows
+      );
+    } else if (data.chapters.status === 'failed') {
+      sections.push(`## Chapters\n\n_Chapter detection failed._`);
+    } else {
+      sections.push(`## Chapters\n\n_No chapters available for this video._`);
+    }
+  }
+
+  const transcriptHeading = `## Transcript (${data.transcript.available ? `Language: ${data.transcript.language} • Words: ${data.transcript.wordCount} • Segments: ${data.transcript.segmentCount}` : 'Unavailable'})`;
+  if (data.transcript.available && data.transcript.segments.length > 0) {
+    let transcriptBody = '';
+    if (opts.withTimestamps) {
+      transcriptBody = data.transcript.segments
+        .map((s) => `- **[${s.timestamp}](${s.url})** ${escapeMarkdown(s.text)}`)
+        .join('\n');
+    } else {
+      transcriptBody = data.transcript.segments
+        .map((s) => escapeMarkdown(s.text))
+        .join('\n\n');
+    }
+    sections.push(`${transcriptHeading}\n\n${transcriptBody}`);
+  } else {
+    sections.push(`${transcriptHeading}\n\n_No transcript available for this video._`);
+  }
+
+  if (opts.includeComments) {
+    if (data.comments.available && data.comments.threads.length > 0) {
+      const sortLabel = data.comments.sortOrder === 'newest' ? 'Newest First' : 'Top Comments';
+      const statusLabel = data.comments.status === 'complete' ? 'Complete extraction' : 'Partial extraction';
+      const warningNotice = data.comments.warning ? `> ⚠️ *Notice:* ${escapeMarkdown(data.comments.warning)}\n\n` : '';
+
+      const commentsHeading = `## Comments (${data.comments.topLevelCount} top-level comments · ${data.comments.replyCount} replies · ${sortLabel} · ${statusLabel})`;
+
+      const threadBlocks = data.comments.threads.map((th, index) => {
+        const top = th.topLevelComment;
+        const authorLink = top.author.channelUrl
+          ? `[${escapeMarkdown(top.author.displayName)}](${top.author.channelUrl})`
+          : `**${escapeMarkdown(top.author.displayName)}**`;
+
+        const badges = [];
+        if (top.isPinned) badges.push('📌 Pinned');
+        if (top.isOwner) badges.push('👑 Creator');
+        const badgeStr = badges.length > 0 ? ` · ${badges.join(' ')}` : '';
+
+        const published = top.publishedAt || 'Unavailable date';
+        const likes = top.likeCount || '0';
+
+        let block = `### #${index + 1} — ${authorLink} · ❤️ ${likes} · ${published}${badgeStr}\n\n` +
+          `| Field | Details |\n` +
+          `| :--- | :--- |\n` +
+          `| **Comment ID** | \`${top.id}\` |\n` +
+          `| **Author** | ${authorLink} |\n` +
+          `| **Published** | ${published} |\n` +
+          `| **Likes** | ❤️ ${likes} |\n` +
+          `| **Replies** | 💬 ${top.replyCount} |\n\n` +
+          `> ${escapeMarkdown(top.text).replace(/\n/g, '\n> ')}\n`;
+
+        if (th.replies.length > 0) {
+          block += `\n> **Replies (${th.replies.length}):**\n>\n`;
+          block += th.replies.map((r, rIdx) => {
+            const rAuthorLink = r.author.channelUrl
+              ? `[${escapeMarkdown(r.author.displayName)}](${r.author.channelUrl})`
+              : `**${escapeMarkdown(r.author.displayName)}**`;
+
+            const rPublished = r.publishedAt ? ` · ${r.publishedAt}` : '';
+            const rLikes = r.likeCount && r.likeCount !== '0' ? ` · ❤️ ${r.likeCount}` : '';
+            const rBadges = [];
+            if (r.isOwner) rBadges.push('👑 Creator');
+            const rBadgeStr = rBadges.length > 0 ? ` · ${rBadges.join(' ')}` : '';
+
+            return `> ↳ **Reply #${index + 1}.${rIdx + 1} — ${rAuthorLink}**${rLikes}${rPublished}${rBadgeStr} [ID: \`${r.id}\`]:\n` +
+              `> > ${escapeMarkdown(r.text).replace(/\n/g, '\n> > ')}\n>`;
+          }).join('\n');
+        }
+
+        return block;
+      }).join('\n---\n\n');
+
+      sections.push(`${commentsHeading}\n\n${warningNotice}${threadBlocks}`);
+    } else if (data.comments.status === 'unavailable') {
+      sections.push(`## Comments\n\n_Comments are disabled for this video._`);
+    } else if (data.comments.status === 'failed') {
+      sections.push(`## Comments\n\n_Comment extraction failed: ${escapeMarkdown(data.comments.error || 'Network error')}._`);
+    } else {
+      sections.push(`## Comments\n\n_No comments extracted._`);
+    }
+  }
+
+  const chReport = data.chapters.available ? `Detected (${data.chapters.count} chapters)` : data.chapters.status;
+  const trReport = data.transcript.available ? `Complete (${data.transcript.segmentCount} segments, ${data.transcript.wordCount} words)` : data.transcript.status;
+  const cmReport = data.comments.available
+    ? `${data.comments.status} (${data.comments.topLevelCount} top-level, ${data.comments.replyCount} replies)`
+    : (opts.includeComments ? data.comments.status : 'Omitted per export settings');
+
+  sections.push(
+    `---\n\n` +
+    `## Extraction Quality Report\n\n` +
+    `| Component | Status | Details |\n` +
+    `| :--- | :--- | :--- |\n` +
+    `| **Metadata** | Complete | Video ID: \`${data.video.id}\` |\n` +
+    `| **Chapters** | ${escapeTableCell(chReport)} | ${data.chapters.available ? 'Player & description markers' : 'None detected'} |\n` +
+    `| **Transcript** | ${escapeTableCell(trReport)} | Language: \`${data.transcript.language}\` |\n` +
+    `| **Comments** | ${escapeTableCell(cmReport)} | Sort: \`${data.comments.sortOrder}\` |\n` +
+    `| **Extracted At** | Complete | ${data.extractedAt} |\n` +
+    `| **Provenance** | Verified | ZapCue In-Page Extractor (DOM & YouTube InnerTube API) |`
+  );
+
+  return sections.join('\n\n');
+}
+
+function toJSON(result, optionsOrTimestamps) {
+  const opts = resolveExportOptions(optionsOrTimestamps);
+  const data = normalizeExportData(result, opts, 'json');
+
+  const payload = {
+    schemaVersion: data.schemaVersion,
+    extractedAt: data.extractedAt,
+    video: {
+      id: data.video.id,
+      url: data.video.url,
+      title: data.video.title,
+      isShort: data.video.isShort,
+      channel: {
+        id: data.video.channel.id,
+        name: data.video.channel.name,
+        url: data.video.channel.url,
+        avatarUrl: data.video.channel.avatarUrl,
+        subscriberInfo: data.video.channel.subscriberInfo
+      },
+      stats: {
+        views: data.video.stats.views,
+        formattedViews: data.video.stats.formattedViews,
+        likes: data.video.stats.likes,
+        durationSeconds: data.video.stats.durationSeconds,
+        formattedDuration: data.video.stats.formattedDuration,
+        uploadDate: data.video.stats.uploadDate
+      },
+      description: data.video.description,
+      images: {
+        thumbnailUrl: data.video.images.thumbnailUrl
+      }
+    },
+    chapters: {
+      available: data.chapters.available,
+      status: data.chapters.status,
+      count: data.chapters.count,
+      items: data.chapters.items.map((c) => ({
+        title: c.title,
+        startSeconds: c.startSeconds,
+        startTimestamp: c.startTimestamp,
+        endSeconds: c.endSeconds,
+        endTimestamp: c.endTimestamp,
+        durationSeconds: c.durationSeconds,
+        formattedDuration: c.formattedDuration,
+        source: c.source
+      }))
+    },
+    transcript: {
+      available: data.transcript.available,
+      status: data.transcript.status,
+      language: data.transcript.language,
+      wordCount: data.transcript.wordCount,
+      segmentCount: data.transcript.segmentCount,
+      segments: data.transcript.segments.map((s) => ({
+        start: s.start,
+        duration: s.duration,
+        timestamp: s.timestamp,
+        text: s.text
+      }))
+    },
+    comments: {
+      available: data.comments.available,
+      status: data.comments.status,
+      sortOrder: data.comments.sortOrder,
+      requestedLimit: data.comments.requestedLimit,
+      effectiveLimit: data.comments.effectiveLimit,
+      topLevelCount: data.comments.topLevelCount,
+      replyCount: data.comments.replyCount,
+      threads: data.comments.threads,
+      error: data.comments.error,
+      reason: data.comments.reason,
+      warning: data.comments.warning
+    },
+    export: data.export
+  };
+
+  return JSON.stringify(payload, null, 2);
+}
+
+function toTXT(result, optionsOrTimestamps, legacyIncludeComments) {
+  const opts = resolveExportOptions(optionsOrTimestamps, legacyIncludeComments);
+  const data = normalizeExportData(result, opts, 'txt');
+
+  const subsDisplay = `${data.video.channel.subscriberInfo.displayText} [Status: ${data.video.channel.subscriberInfo.status}]`;
+  const videoType = data.video.isShort ? 'YouTube Short' : 'Standard video';
+
+  const lines = [
+    'ZAPCUE VIDEO RESEARCH EXPORT',
+    '================================================================',
+    `TITLE:       ${data.video.title}`,
+    `VIDEO URL:   ${data.video.url}`,
+    `VIDEO ID:    ${data.video.id}`,
+    `EXTRACTED:   ${data.extractedAt}`,
+    '',
+    'VIDEO INFORMATION',
+    '----------------------------------------------------------------',
+    `CHANNEL:     ${data.video.channel.name}`,
+    `CHANNEL URL: ${data.video.channel.url}`,
+    `SUBSCRIBERS: ${subsDisplay}`,
+    `VIEWS:       ${data.video.stats.formattedViews}`,
+    `LIKES:       ${data.video.stats.likes}`,
+    `DURATION:    ${data.video.stats.formattedDuration}`,
+    `PUBLISHED:   ${data.video.stats.uploadDate}`,
+    `VIDEO TYPE:  ${videoType}`,
+    '',
+    'IMAGES',
+    '----------------------------------------------------------------',
+    `THUMBNAIL:      ${opts.includeImages && data.video.images.thumbnailUrl ? data.video.images.thumbnailUrl : (opts.includeImages ? 'Unavailable' : 'Omitted per export settings')}`,
+    `CHANNEL AVATAR: ${opts.includeImages && data.video.images.channelAvatarUrl ? data.video.images.channelAvatarUrl : (opts.includeImages ? 'Unavailable' : 'Omitted per export settings')}`,
+    '',
+    'DESCRIPTION',
+    '----------------------------------------------------------------',
+    data.video.description || 'No description provided.',
+    ''
+  ];
+
+  if (opts.includeChapters) {
+    if (data.chapters.available && data.chapters.items.length > 0) {
+      lines.push(`CHAPTERS (${data.chapters.items.length})`);
+      lines.push('----------------------------------------------------------------');
+      for (const c of data.chapters.items) {
+        const dur = c.formattedDuration ? ` (Duration: ${c.formattedDuration})` : '';
+        lines.push(`[${c.startTimestamp}] ${c.title}${dur}`);
+      }
+      lines.push('');
+    } else if (data.chapters.status === 'failed') {
+      lines.push('CHAPTERS');
+      lines.push('----------------------------------------------------------------');
+      lines.push('Chapter detection failed.');
+      lines.push('');
+    }
+  }
+
+  const trSummary = data.transcript.available
+    ? `${data.transcript.language} | ${data.transcript.wordCount} words | ${data.transcript.segmentCount} segments`
+    : 'Unavailable';
+
+  lines.push(`TRANSCRIPT (${trSummary})`);
+  lines.push('----------------------------------------------------------------');
+  if (data.transcript.available && data.transcript.segments.length > 0) {
+    if (opts.withTimestamps) {
+      for (const s of data.transcript.segments) {
+        lines.push(`[${s.timestamp}] ${s.text}`);
+      }
+    } else {
+      for (const s of data.transcript.segments) {
+        lines.push(s.text);
+      }
+    }
+  } else {
+    lines.push('No transcript available for this video.');
+  }
+  lines.push('');
+
+  if (opts.includeComments) {
+    if (data.comments.available && data.comments.threads.length > 0) {
+      const sortLabel = data.comments.sortOrder === 'newest' ? 'Newest' : 'Top';
+      const statusLabel = data.comments.status === 'complete' ? 'Complete' : 'Partial';
+
+      lines.push('================================================================');
+      lines.push(`COMMENTS (${data.comments.topLevelCount} top-level | ${data.comments.replyCount} replies | ${sortLabel} | ${statusLabel})`);
+      lines.push('================================================================');
+      lines.push('');
+
+      data.comments.threads.forEach((th, idx) => {
+        const top = th.topLevelComment;
+        lines.push(`[${idx + 1}] PARENT COMMENT`);
+        lines.push(`Author:    ${top.author.displayName}`);
+        lines.push(`Channel:   ${top.author.channelUrl || 'Unavailable'}`);
+        lines.push(`Published: ${top.publishedAt || 'Unavailable'}`);
+        lines.push(`Likes:     ${top.likeCount}`);
+        lines.push(`Replies:   ${top.replyCount}`);
+        lines.push('Text:');
+        lines.push('  ' + top.text.replace(/\n/g, '\n  '));
+
+        if (th.replies.length > 0) {
+          th.replies.forEach((r, rIdx) => {
+            lines.push('');
+            lines.push(`  └── REPLY ${rIdx + 1}`);
+            lines.push(`      Author:    ${r.author.displayName}`);
+            lines.push(`      Channel:   ${r.author.channelUrl || 'Unavailable'}`);
+            lines.push(`      Published: ${r.publishedAt || 'Unavailable'}`);
+            lines.push(`      Likes:     ${r.likeCount}`);
+            lines.push('      Text:');
+            lines.push('        ' + r.text.replace(/\n/g, '\n        '));
+          });
+        }
+        lines.push('');
+        lines.push('----------------------------------------------------------------');
+      });
+      lines.push('');
+    } else if (data.comments.status === 'unavailable') {
+      lines.push('COMMENTS');
+      lines.push('----------------------------------------------------------------');
+      lines.push('Comments are disabled for this video.');
+      lines.push('');
+    } else if (data.comments.status === 'failed') {
+      lines.push('COMMENTS');
+      lines.push('----------------------------------------------------------------');
+      lines.push(`Comment extraction failed: ${data.comments.error || 'Network error'}`);
+      lines.push('');
+    }
+  }
+
+  const chStatusText = data.chapters.available ? `available (${data.chapters.count} chapters)` : data.chapters.status;
+  const trStatusText = data.transcript.available ? 'complete' : data.transcript.status;
+  const cmStatusText = data.comments.available
+    ? `${data.comments.status} (${data.comments.topLevelCount} top-level comments; ${data.comments.replyCount} replies)`
+    : (opts.includeComments ? data.comments.status : 'omitted per export settings');
+
+  lines.push('EXTRACTION STATUS');
+  lines.push('----------------------------------------------------------------');
+  lines.push('Metadata:   complete');
+  lines.push(`Chapters:   ${chStatusText}`);
+  lines.push(`Transcript: ${trStatusText}`);
+  lines.push(`Comments:   ${cmStatusText}`);
+  lines.push(`Notes:      Clean research export generated by ZapCue.`);
+
+  return lines.join('\n');
+}
+
+// Comprehensive Fixture for testing exports & cross-format parity
+const exportFixture = {
+  videoId: 'dQw4w9WgXcQ',
+  extractedAt: '2026-10-22T08:00:00.000Z',
+  metadata: {
+    videoId: 'dQw4w9WgXcQ',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    title: 'Advanced AI Architectures <2026> | Multimodal LLMs',
+    channelName: 'DeepMind Dev',
+    channelUrl: 'https://www.youtube.com/@deepmind',
+    viewCount: 690006,
+    formattedViews: '690,006 views (690K)',
+    likeCount: '6,333',
+    durationSeconds: 966,
+    formattedDuration: '16:06',
+    uploadDate: '2026-03-15',
+    description: 'Deep dive into transformers and graph networks.\n\nEnjoy the full tutorial!',
+    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+    channelAvatarUrl: 'https://yt3.ggpht.com/avatar.jpg',
+    subscriberInfo: { count: null, displayText: '1.5M subscribers', status: 'rounded' },
+    isShort: false
+  },
+  chapters: {
+    available: true,
+    status: 'detected',
+    items: [
+      {
+        title: 'Introduction & Scope | Overview',
+        startSeconds: 0,
+        startTimestamp: '00:00',
+        durationSeconds: 150,
+        formattedDuration: '02:30',
+        source: 'player_markers'
+      },
+      {
+        title: 'Graph Transformer Attention',
+        startSeconds: 150,
+        startTimestamp: '02:30',
+        durationSeconds: 816,
+        formattedDuration: '13:36',
+        source: 'player_markers'
+      }
+    ]
+  },
+  transcript: {
+    available: true,
+    selectedLanguage: 'en',
+    wordCount: 14,
+    segments: [
+      { start: 0, duration: 2.5, timestamp: '00:00', text: 'Welcome to the AI research breakdown.' },
+      { start: 150, duration: 4.0, timestamp: '02:30', text: 'Next we analyze transformer attention matrices.' }
+    ]
+  },
+  comments: {
+    available: true,
+    status: 'complete',
+    sortOrder: 'top',
+    requestedLimit: 50,
+    effectiveLimit: 50,
+    topLevelCount: 1,
+    replyCount: 1,
+    extractedCount: 2,
+    warning: null,
+    reason: 'reached_limit',
+    threads: [
+      {
+        id: 'c_top_1',
+        videoId: 'dQw4w9WgXcQ',
+        text: 'Phenomenal breakdown of <script>alert(1)</script> & attention!',
+        author: {
+          displayName: 'Alice Research',
+          channelUrl: 'https://www.youtube.com/@alice',
+          avatarUrl: 'https://yt3.ggpht.com/alice.jpg'
+        },
+        publishedAt: '2 days ago',
+        likeCount: '42',
+        replyCount: 1,
+        isPinned: true,
+        isOwner: false,
+        replies: [
+          {
+            id: 'r_sub_1',
+            parentCommentId: 'c_top_1',
+            videoId: 'dQw4w9WgXcQ',
+            text: 'Thank you Alice! Happy researching.',
+            author: {
+              displayName: 'DeepMind Dev',
+              channelUrl: 'https://www.youtube.com/@deepmind',
+              avatarUrl: 'https://yt3.ggpht.com/avatar.jpg'
+            },
+            publishedAt: '1 day ago',
+            likeCount: '12',
+            replyCount: 0,
+            isPinned: false,
+            isOwner: true
+          }
+        ]
+      }
+    ]
+  }
+};
+
+it('generates Markdown starting with H1 title, clickable embedded thumbnail, and channel identity', () => {
+  const md = toMarkdown(exportFixture);
+  assert.ok(md.startsWith('# Advanced AI Architectures &lt;2026&gt; | Multimodal LLMs'));
+  assert.ok(md.includes('[![Video thumbnail: Advanced AI Architectures &lt;2026&gt; | Multimodal LLMs](https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)'));
+  assert.ok(md.includes('[![DeepMind Dev Avatar](https://yt3.ggpht.com/avatar.jpg)](https://www.youtube.com/@deepmind) **[DeepMind Dev](https://www.youtube.com/@deepmind)** • 1.5M subscribers (rounded)'));
+});
+
+it('escapes Markdown table delimiters and unsafe HTML entities cleanly', () => {
+  const md = toMarkdown(exportFixture);
+  assert.ok(md.includes('| Subscribers | 1.5M subscribers (rounded) |'));
   assert.ok(md.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
-  assert.ok(md.includes('↳ #1.1 DeepMind Dev** [ID: `r_sub_1`]'));
+  assert.ok(md.includes('Introduction &amp; Scope \\| Overview') || md.includes('Introduction & Scope \\| Overview'));
+});
+
+it('generates clickable timestamp URLs in chapters and transcript lines', () => {
+  const md = toMarkdown(exportFixture);
+  assert.ok(md.includes('**[00:00](https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0s)**'));
+  assert.ok(md.includes('**[02:30](https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=150s)**'));
+});
+
+it('renders visibly nested comments with badges and reply indentation', () => {
+  const md = toMarkdown(exportFixture);
+  assert.ok(md.includes('### #1 — [Alice Research](https://www.youtube.com/@alice) · ❤️ 42 · 2 days ago · 📌 Pinned'));
+  assert.ok(md.includes('> Phenomenal breakdown'));
+  assert.ok(md.includes('> ↳ **Reply #1.1 — [DeepMind Dev](https://www.youtube.com/@deepmind)** · ❤️ 12 · 1 day ago · 👑 Creator [ID: `r_sub_1`]:'));
+  assert.ok(md.includes('> > Thank you Alice!'));
+});
+
+it('respects Markdown export exclusion options for chapters, comments, and images', () => {
+  const mdExcluded = toMarkdown(exportFixture, {
+    includeChapters: false,
+    includeComments: false,
+    includeImages: false,
+    withTimestamps: false
+  });
+  assert.ok(!mdExcluded.includes('[![Video thumbnail:'), 'Images must be excluded');
+  assert.ok(!mdExcluded.includes('## Chapters ('), 'Chapters section must be excluded');
+  assert.ok(!mdExcluded.includes('## Comments ('), 'Comments section must be excluded');
+  assert.ok(mdExcluded.includes('## Description'), 'Description must remain');
+  assert.ok(mdExcluded.includes('Welcome to the AI research breakdown.'), 'Continuous text without timestamp links must remain');
+});
+
+// ----------------------------------------------------------------------
+// Test Group 18: Canonical JSON Export (Schema, Types, Correctness & Exclusions)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 18: Canonical JSON Export (Schema, Types & Exclusions) ---');
+
+it('parses valid JSON with exact canonical schemaVersion 2', () => {
+  const jsonStr = toJSON(exportFixture);
+  const parsed = JSON.parse(jsonStr);
+
+  assert.strictEqual(parsed.schemaVersion, 2);
+  assert.strictEqual(parsed.extractedAt, '2026-10-22T08:00:00.000Z');
+  assert.strictEqual(parsed.video.id, 'dQw4w9WgXcQ');
+  assert.strictEqual(parsed.video.stats.views, 690006);
+  assert.strictEqual(parsed.video.stats.durationSeconds, 966);
+  assert.strictEqual(parsed.video.images.thumbnailUrl, 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+
+  assert.strictEqual(parsed.chapters.count, 2);
+  assert.strictEqual(parsed.chapters.items[0].startSeconds, 0);
+  assert.strictEqual(parsed.chapters.items[1].durationSeconds, 816);
+
+  assert.strictEqual(parsed.transcript.segmentCount, 2);
+  assert.strictEqual(parsed.transcript.segments[0].timestamp, '00:00');
+
+  assert.strictEqual(parsed.comments.topLevelCount, 1);
+  assert.strictEqual(parsed.comments.replyCount, 1);
+  assert.strictEqual(parsed.comments.threads[0].topLevelComment.id, 'c_top_1');
+  assert.strictEqual(parsed.comments.threads[0].replies[0].id, 'r_sub_1');
+  assert.strictEqual(parsed.comments.threads[0].topLevelComment.isPinned, true);
+  assert.strictEqual(parsed.comments.threads[0].replies[0].isOwner, true);
+
+  assert.strictEqual(parsed.export.format, 'json');
+  assert.strictEqual(parsed.export.included.chapters, true);
+  assert.strictEqual(parsed.export.included.comments, true);
+});
+
+it('honors exclusion settings in JSON export structure', () => {
+  const jsonStr = toJSON(exportFixture, {
+    includeChapters: false,
+    includeComments: false,
+    includeImages: false
+  });
+  const parsed = JSON.parse(jsonStr);
+
+  assert.strictEqual(parsed.export.included.chapters, false);
+  assert.strictEqual(parsed.export.included.comments, false);
+  assert.strictEqual(parsed.chapters.items.length, 0);
+  assert.strictEqual(parsed.comments.threads.length, 0);
+  assert.strictEqual(parsed.video.images.thumbnailUrl, null);
+});
+
+// ----------------------------------------------------------------------
+// Test Group 19: Plain Text Export (Portability, Hierarchy & Status Block)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 19: Plain Text Export (Portability & Hierarchy) ---');
+
+it('generates portable Plain Text with clean banners and no Markdown constructs', () => {
+  const txt = toTXT(exportFixture);
+  assert.ok(txt.startsWith('ZAPCUE VIDEO RESEARCH EXPORT\n================================================================'));
+  assert.ok(txt.includes('TITLE:       Advanced AI Architectures <2026> | Multimodal LLMs'));
+  assert.ok(txt.includes('SUBSCRIBERS: 1.5M subscribers [Status: rounded]'));
+  assert.ok(txt.includes('THUMBNAIL:      https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'));
+  assert.ok(txt.includes('[00:00] Introduction & Scope | Overview (Duration: 02:30)'));
+  assert.ok(txt.includes('[00:00] Welcome to the AI research breakdown.'));
+
+  // Ensure no Markdown table or image syntax leaked into plain text
+  assert.ok(!txt.includes('| Field | Value |'), 'Must not contain Markdown table headers');
+  assert.ok(!txt.includes('[!['), 'Must not contain Markdown image links');
+});
+
+it('indents nested comment replies cleanly with tree branch symbols in Plain Text', () => {
+  const txt = toTXT(exportFixture);
+  assert.ok(txt.includes('[1] PARENT COMMENT'));
+  assert.ok(txt.includes('Author:    Alice Research'));
+  assert.ok(txt.includes('Likes:     42'));
+  assert.ok(txt.includes('  └── REPLY 1'));
+  assert.ok(txt.includes('      Author:    DeepMind Dev'));
+  assert.ok(txt.includes('      Likes:     12'));
+  assert.ok(txt.includes('      Text:\n        Thank you Alice! Happy researching.'));
+  assert.ok(txt.includes('EXTRACTION STATUS\n----------------------------------------------------------------'));
+  assert.ok(txt.includes('Chapters:   available (2 chapters)'));
+  assert.ok(txt.includes('Transcript: complete'));
+});
+
+// ----------------------------------------------------------------------
+// Test Group 20: Cross-Format Consistency & Parity Validation
+// ----------------------------------------------------------------------
+console.log('\n--- Group 20: Cross-Format Consistency & Parity Validation ---');
+
+it('guarantees identical core data representation across Markdown, JSON, and Plain Text', () => {
+  const md = toMarkdown(exportFixture);
+  const jsonStr = toJSON(exportFixture);
+  const txt = toTXT(exportFixture);
+  const json = JSON.parse(jsonStr);
+
+  // 1. Video ID Parity
+  assert.strictEqual(json.video.id, 'dQw4w9WgXcQ');
+  assert.ok(md.includes('dQw4w9WgXcQ'));
+  assert.ok(txt.includes('VIDEO ID:    dQw4w9WgXcQ'));
+
+  // 2. Channel & Subscriber Parity
+  assert.strictEqual(json.video.channel.name, 'DeepMind Dev');
+  assert.strictEqual(json.video.channel.subscriberInfo.displayText, '1.5M subscribers');
+  assert.strictEqual(json.video.channel.subscriberInfo.status, 'rounded');
+  assert.ok(md.includes('DeepMind Dev'));
+  assert.ok(md.includes('1.5M subscribers (rounded)'));
+  assert.ok(txt.includes('CHANNEL:     DeepMind Dev'));
+  assert.ok(txt.includes('SUBSCRIBERS: 1.5M subscribers [Status: rounded]'));
+
+  // 3. Thumbnail Parity
+  const thumbUrl = 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+  assert.strictEqual(json.video.images.thumbnailUrl, thumbUrl);
+  assert.ok(md.includes(thumbUrl));
+  assert.ok(txt.includes(`THUMBNAIL:      ${thumbUrl}`));
+
+  // 4. Chapter Count Parity
+  assert.strictEqual(json.chapters.count, 2);
+  assert.ok(md.includes('Chapters (2 Detected)'));
+  assert.ok(txt.includes('CHAPTERS (2)'));
+
+  // 5. Transcript Segment Count Parity
+  assert.strictEqual(json.transcript.segmentCount, 2);
+  assert.ok(md.includes('Segments: 2'));
+  assert.ok(txt.includes('2 segments'));
+
+  // 6. Comment and Reply Count Parity
+  assert.strictEqual(json.comments.topLevelCount, 1);
+  assert.strictEqual(json.comments.replyCount, 1);
+  assert.ok(md.includes('1 top-level comments · 1 replies'));
+  assert.ok(txt.includes('1 top-level | 1 replies'));
+
+  // 7. Extraction Status Truthfulness Parity
+  assert.strictEqual(json.chapters.status, 'detected');
+  assert.strictEqual(json.transcript.status, 'complete');
+  assert.strictEqual(json.comments.status, 'complete');
+  assert.ok(md.includes('Extraction Quality Report'));
+  assert.ok(txt.includes('EXTRACTION STATUS'));
 });
 
 // ----------------------------------------------------------------------

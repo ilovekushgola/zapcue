@@ -40,6 +40,9 @@ export class ExtractorPanel {
   private isCommentsExpanded = false;
   private commentSortOrder: 'top' | 'newest' = 'top';
   private includeCommentsInCopy = false;
+  private exportIncludeChapters = true;
+  private exportIncludeImages = true;
+  private exportIncludeComments = true;
 
   private callbacks: PanelCallbacks;
   private toastTimer: any = null;
@@ -76,6 +79,9 @@ export class ExtractorPanel {
     if (settings.defaultCommentsExpanded !== undefined) this.isCommentsExpanded = settings.defaultCommentsExpanded;
     if (settings.commentSortOrder !== undefined) this.commentSortOrder = settings.commentSortOrder;
     if (settings.includeCommentsInCopy !== undefined) this.includeCommentsInCopy = settings.includeCommentsInCopy;
+    if (settings.exportIncludeChapters !== undefined) this.exportIncludeChapters = settings.exportIncludeChapters;
+    if (settings.exportIncludeImages !== undefined) this.exportIncludeImages = settings.exportIncludeImages;
+    if (settings.exportIncludeComments !== undefined) this.exportIncludeComments = settings.exportIncludeComments;
     this.render();
   }
 
@@ -709,7 +715,13 @@ export class ExtractorPanel {
         return;
       }
 
-      const textToCopy = toTXT(this.result, this.showTimestamps, this.includeCommentsInCopy);
+      const textToCopy = toTXT(this.result, {
+        withTimestamps: this.showTimestamps,
+        includeChapters: this.exportIncludeChapters,
+        includeImages: this.exportIncludeImages,
+        includeComments: this.includeCommentsInCopy,
+        isCopyAction: true
+      });
       const success = await copyTextToClipboard(textToCopy);
       if (success) {
         this.showToast(this.showTimestamps 
@@ -773,16 +785,24 @@ export class ExtractorPanel {
     this.isExportMenuOpen = false;
     this.shadowRoot.getElementById('dash-export-menu')?.classList.remove('show');
 
+    const options = {
+      withTimestamps: this.showTimestamps,
+      includeChapters: this.exportIncludeChapters,
+      includeImages: this.exportIncludeImages,
+      includeComments: this.exportIncludeComments,
+      isCopyAction: false
+    };
+
     if (format === 'md') {
-      const content = toMarkdown(this.result, this.showTimestamps, true);
+      const content = toMarkdown(this.result, options);
       downloadFile(`${baseName}.md`, content, 'text/markdown;charset=utf-8');
       this.showToast('✓ Downloading Markdown (.md)');
     } else if (format === 'json') {
-      const content = toJSON(this.result);
+      const content = toJSON(this.result, options);
       downloadFile(`${baseName}.json`, content, 'application/json;charset=utf-8');
       this.showToast('✓ Downloading JSON (.json)');
     } else if (format === 'txt') {
-      const content = toTXT(this.result, this.showTimestamps, true);
+      const content = toTXT(this.result, options);
       downloadFile(`${baseName}.txt`, content, 'text/plain;charset=utf-8');
       this.showToast('✓ Downloading Plain Text (.txt)');
     }
