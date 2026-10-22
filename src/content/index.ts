@@ -17,6 +17,7 @@ let panel: ExtractorPanel | null = null;
 let activeSettings: ZapcueSettings = { ...DEFAULT_SETTINGS };
 let lastInnertubeApiKey = '';
 let lastInnertubeContext: any = null;
+let lastCommentsToken: string | null = null;
 
 /**
  * Extracts video ID from current window location.
@@ -98,7 +99,8 @@ async function runExtractionPipeline(videoId: string, requestId: number): Promis
           sortOrder: activeSettings.commentSortOrder,
           includeReplies: activeSettings.includeCommentReplies,
           innertubeApiKey: lastInnertubeApiKey,
-          innertubeContext: lastInnertubeContext
+          innertubeContext: lastInnertubeContext,
+          initialCommentsToken: lastCommentsToken
         }).then((comments) => {
           if (currentRequestId === requestId || requestId === 0) {
             cached.comments = comments;
@@ -129,10 +131,11 @@ async function runExtractionPipeline(videoId: string, requestId: number): Promis
  * Handles incoming player response dispatched by the Main World bridge.
  */
 async function handleBridgeResponse(detail: any): Promise<void> {
-  const { requestId, videoId, playerResponse, innertubeApiKey, innertubeContext } = detail;
+  const { requestId, videoId, playerResponse, innertubeApiKey, innertubeContext, commentsToken } = detail;
 
   if (innertubeApiKey) lastInnertubeApiKey = innertubeApiKey;
   if (innertubeContext) lastInnertubeContext = innertubeContext;
+  if (commentsToken) lastCommentsToken = commentsToken;
 
   // Guard against race conditions: Ignore responses from past requests
   if (requestId !== 0 && requestId !== currentRequestId) {
@@ -194,7 +197,8 @@ async function handleBridgeResponse(detail: any): Promise<void> {
         sortOrder: activeSettings.commentSortOrder,
         includeReplies: activeSettings.includeCommentReplies,
         innertubeApiKey: lastInnertubeApiKey,
-        innertubeContext: lastInnertubeContext
+        innertubeContext: lastInnertubeContext,
+        initialCommentsToken: lastCommentsToken
       }).then((comments) => {
         if (currentRequestId === requestId || requestId === 0) {
           result.comments = comments;
@@ -282,7 +286,8 @@ function initPanel(): void {
           sortOrder: newSort,
           includeReplies: activeSettings.includeCommentReplies,
           innertubeApiKey: lastInnertubeApiKey,
-          innertubeContext: lastInnertubeContext
+          innertubeContext: lastInnertubeContext,
+          initialCommentsToken: lastCommentsToken
         });
         panel?.setComments(comments);
       }
@@ -302,8 +307,42 @@ async function loadSettings(): Promise<void> {
 
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(async () => {
+      const prevLimit = activeSettings.commentLimit;
+      const prevSort = activeSettings.commentSortOrder;
+      const prevReplies = activeSettings.includeCommentReplies;
+
       activeSettings = await getSettings();
       panel?.setSettings(activeSettings);
+
+      // If user changed comment settings while viewing a video, automatically refresh comments
+      if (panel && (prevLimit !== activeSettings.commentLimit || prevSort !== activeSettings.commentSortOrder || prevReplies !== activeSettings.includeCommentReplies)) {
+        const vid = getCurrentVideoId();
+        if (vid && activeSettings.autoExtractComments) {
+          panel.setComments({
+            available: false,
+            status: 'loading',
+            sortOrder: activeSettings.commentSortOrder,
+            requestedLimit: activeSettings.commentLimit,
+            effectiveLimit: activeSettings.commentLimit,
+            topLevelCount: 0,
+            replyCount: 0,
+            extractedCount: 0,
+            threads: []
+          });
+
+          const comments = await extractComments({
+            videoId: vid,
+            limit: activeSettings.commentLimit,
+            sortOrder: activeSettings.commentSortOrder,
+            includeReplies: activeSettings.includeCommentReplies,
+            innertubeApiKey: lastInnertubeApiKey,
+            innertubeContext: lastInnertubeContext,
+            initialCommentsToken: lastCommentsToken
+          });
+
+          panel.setComments(comments);
+        }
+      }
     });
   }
 }

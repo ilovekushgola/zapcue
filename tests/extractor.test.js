@@ -1785,6 +1785,241 @@ it('guarantees identical core data representation across Markdown, JSON, and Pla
 });
 
 // ----------------------------------------------------------------------
+// Test Group 21: Modern YouTube ViewModel & Entity Mutations Comments Parsing
+// ----------------------------------------------------------------------
+console.log('\n--- Group 21: Modern YouTube ViewModel & Entity Mutations Comments Parsing ---');
+
+function mockBuildEntityMap(data) {
+  const map = new Map();
+  try {
+    const mutations = data?.frameworkUpdates?.entityBatchUpdate?.mutations;
+    if (Array.isArray(mutations)) {
+      for (const m of mutations) {
+        if (m.entityKey && m.payload?.commentEntityPayload) {
+          map.set(m.entityKey, m.payload.commentEntityPayload);
+          const cid = m.payload.commentEntityPayload.properties?.commentId;
+          if (cid) {
+            map.set(cid, m.payload.commentEntityPayload);
+          }
+        }
+      }
+    }
+  } catch {}
+  return map;
+}
+
+function mockParseCommentViewModel(vm, entityMap, videoId, parentCommentId) {
+  if (!vm) return null;
+  const inner = vm.commentViewModel || vm;
+  const commentKey = inner.commentKey || inner.commentId || '';
+  const entity = entityMap.get(commentKey) || (inner.commentId ? entityMap.get(inner.commentId) : null);
+
+  if (entity) {
+    const props = entity.properties || {};
+    const author = entity.author || {};
+    const toolbar = entity.toolbar || {};
+
+    return {
+      id: props.commentId || inner.commentId || commentKey,
+      videoId,
+      parentCommentId,
+      text: props.content?.content || '',
+      author: {
+        displayName: author.displayName || 'Anonymous',
+        channelUrl: author.channelId ? `https://www.youtube.com/channel/${author.channelId}` : undefined,
+        avatarUrl: author.avatarThumbnailUrl || undefined
+      },
+      publishedAt: props.publishedTime || undefined,
+      likeCount: toolbar.likeCountNotliked || toolbar.likeCountLiked || '0',
+      replyCount: parseInt(toolbar.replyCount || '0', 10) || 0,
+      isOwner: Boolean(author.isCreator),
+      isPinned: Boolean(props.isPinned || inner.pinnedBadge)
+    };
+  }
+
+  // Fallback to inline ViewModel
+  return {
+    id: inner.commentId || commentKey || 'c_1',
+    videoId,
+    parentCommentId,
+    text: inner.contentText?.content || '',
+    author: { displayName: inner.authorName || 'Anonymous' },
+    likeCount: inner.likeCount || '0',
+    replyCount: inner.replyCount || 0
+  };
+}
+
+function mockFindCommentsToken(data) {
+  if (!data || typeof data !== 'object') return null;
+  try {
+    const sections = data?.contents?.twoColumnWatchNextResults?.results?.results?.contents;
+    if (Array.isArray(sections)) {
+      for (const s of sections) {
+        const itemSection = s?.itemSectionRenderer;
+        const targetId = itemSection?.targetId || itemSection?.sectionIdentifier;
+        if (targetId === 'comments-section' || targetId === 'comment-item-section') {
+          if (Array.isArray(itemSection.contents)) {
+            for (const c of itemSection.contents) {
+              const token = c?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+              if (token) return token;
+            }
+          }
+          const legacy = itemSection?.continuations?.[0]?.nextContinuationData?.continuation;
+          if (legacy) return legacy;
+        }
+      }
+    }
+
+    const panels = data?.engagementPanels;
+    if (Array.isArray(panels)) {
+      for (const p of panels) {
+        const target = p?.engagementPanelSectionListRenderer?.targetId || p?.targetId || '';
+        if (typeof target === 'string' && target.toLowerCase().includes('comment')) {
+          const contents = p?.engagementPanelSectionListRenderer?.content?.sectionListRenderer?.contents;
+          if (Array.isArray(contents)) {
+            for (const c of contents) {
+              const innerContents = c?.itemSectionRenderer?.contents;
+              if (Array.isArray(innerContents)) {
+                for (const ic of innerContents) {
+                  const token = ic?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+                  if (token) return token;
+                }
+              }
+              const directToken = c?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+              if (directToken) return directToken;
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
+it('locates continuation token in modern YouTube twoColumnWatchNextResults layout', () => {
+  const modernNextResponse = {
+    contents: {
+      twoColumnWatchNextResults: {
+        results: {
+          results: {
+            contents: [
+              {
+                itemSectionRenderer: {
+                  targetId: 'comments-section',
+                  contents: [
+                    {
+                      continuationItemRenderer: {
+                        continuationEndpoint: {
+                          continuationCommand: {
+                            token: 'token_comments_init_99'
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  };
+
+  const token = mockFindCommentsToken(modernNextResponse);
+  assert.strictEqual(token, 'token_comments_init_99');
+});
+
+it('locates continuation token in modern YouTube engagementPanels layout', () => {
+  const engagementPanelResponse = {
+    engagementPanels: [
+      {
+        engagementPanelSectionListRenderer: {
+          targetId: 'engagement-panel-comments',
+          content: {
+            sectionListRenderer: {
+              contents: [
+                {
+                  itemSectionRenderer: {
+                    contents: [
+                      {
+                        continuationItemRenderer: {
+                          continuationEndpoint: {
+                            continuationCommand: {
+                              token: 'token_panel_comments_88'
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  };
+
+  const token = mockFindCommentsToken(engagementPanelResponse);
+  assert.strictEqual(token, 'token_panel_comments_88');
+});
+
+it('correctly maps modern commentViewModel to frameworkUpdates entity mutations', () => {
+  const mockModernCommentResponse = {
+    frameworkUpdates: {
+      entityBatchUpdate: {
+        mutations: [
+          {
+            entityKey: 'comment_entity_key_abc',
+            payload: {
+              commentEntityPayload: {
+                properties: {
+                  commentId: 'Ugz_test_comment_1',
+                  content: { content: 'This is genuinely a fantastic conversation full of great info for D2C!' },
+                  publishedTime: '1 year ago'
+                },
+                author: {
+                  displayName: '@freedomutopuia',
+                  channelId: 'UC_freedom_channel',
+                  avatarThumbnailUrl: 'https://yt3.ggpht.com/freedom.jpg',
+                  isCreator: false
+                },
+                toolbar: {
+                  likeCountNotliked: '4',
+                  replyCount: '1'
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  };
+
+  const entityMap = mockBuildEntityMap(mockModernCommentResponse);
+  assert.ok(entityMap.has('comment_entity_key_abc'));
+  assert.ok(entityMap.has('Ugz_test_comment_1'));
+
+  const viewModel = {
+    commentViewModel: {
+      commentKey: 'comment_entity_key_abc',
+      commentId: 'Ugz_test_comment_1'
+    }
+  };
+
+  const parsed = mockParseCommentViewModel(viewModel, entityMap, 'f1SdVoL4nmk');
+  assert.strictEqual(parsed.id, 'Ugz_test_comment_1');
+  assert.strictEqual(parsed.author.displayName, '@freedomutopuia');
+  assert.strictEqual(parsed.author.channelUrl, 'https://www.youtube.com/channel/UC_freedom_channel');
+  assert.strictEqual(parsed.text, 'This is genuinely a fantastic conversation full of great info for D2C!');
+  assert.strictEqual(parsed.publishedAt, '1 year ago');
+  assert.strictEqual(parsed.likeCount, '4');
+  assert.strictEqual(parsed.replyCount, 1);
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');

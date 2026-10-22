@@ -51,6 +51,76 @@
     }
   }
 
+  function findCommentsToken(data: any): string | null {
+    if (!data || typeof data !== 'object') return null;
+
+    try {
+      // 1. TwoColumnWatchNextResults -> itemSectionRenderer
+      const sections = data?.contents?.twoColumnWatchNextResults?.results?.results?.contents;
+      if (Array.isArray(sections)) {
+        for (const s of sections) {
+          const itemSection = s?.itemSectionRenderer;
+          const targetId = itemSection?.targetId || itemSection?.sectionIdentifier;
+          if (targetId === 'comments-section' || targetId === 'comment-item-section') {
+            if (Array.isArray(itemSection.contents)) {
+              for (const c of itemSection.contents) {
+                const token = c?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+                if (token) return token;
+              }
+            }
+            const legacy = itemSection?.continuations?.[0]?.nextContinuationData?.continuation;
+            if (legacy) return legacy;
+          }
+        }
+      }
+
+      // 2. Engagement panels
+      const panels = data?.engagementPanels;
+      if (Array.isArray(panels)) {
+        for (const p of panels) {
+          const target = p?.engagementPanelSectionListRenderer?.targetId || p?.targetId || '';
+          if (typeof target === 'string' && target.toLowerCase().includes('comment')) {
+            const contents = p?.engagementPanelSectionListRenderer?.content?.sectionListRenderer?.contents;
+            if (Array.isArray(contents)) {
+              for (const c of contents) {
+                const innerContents = c?.itemSectionRenderer?.contents;
+                if (Array.isArray(innerContents)) {
+                  for (const ic of innerContents) {
+                    const token = ic?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+                    if (token) return token;
+                  }
+                }
+                const directToken = c?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+                if (directToken) return directToken;
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Fast scan for continuationCommand token
+      const queue: any[] = [data];
+      let inspected = 0;
+      while (queue.length > 0 && inspected < 800) {
+        inspected++;
+        const curr = queue.shift();
+        if (!curr || typeof curr !== 'object') continue;
+
+        if (curr.continuationCommand?.token && typeof curr.continuationCommand.token === 'string') {
+          return curr.continuationCommand.token;
+        }
+
+        for (const k of Object.keys(curr)) {
+          if (typeof curr[k] === 'object' && curr[k] !== null) {
+            queue.push(curr[k]);
+          }
+        }
+      }
+    } catch {}
+
+    return null;
+  }
+
   function dispatchPlayerResponse(requestId = 0) {
     const videoId = getCurrentVideoId();
     if (!videoId) return;
@@ -65,11 +135,20 @@
       if (playerResponse || attempts >= maxAttempts) {
         let innertubeApiKey = '';
         let innertubeContext: any = null;
+        let commentsToken: string | null = null;
+
         try {
           const ytcfg = (window as any).ytcfg;
           if (typeof ytcfg?.get === 'function') {
             innertubeApiKey = ytcfg.get('INNERTUBE_API_KEY') || '';
             innertubeContext = ytcfg.get('INNERTUBE_CONTEXT') || null;
+          }
+        } catch {}
+
+        try {
+          const initialData = (window as any).ytInitialData;
+          if (initialData) {
+            commentsToken = findCommentsToken(initialData);
           }
         } catch {}
 
@@ -81,6 +160,7 @@
               playerResponse,
               innertubeApiKey,
               innertubeContext,
+              commentsToken,
               timestamp: Date.now()
             }
           })

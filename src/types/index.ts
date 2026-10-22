@@ -150,4 +150,8 @@ export interface ExportOptions {
 export interface BridgeMessagePayload {
   videoId: string;
   playerResponse?: any;
+  innertubeApiKey?: string;
+  innertubeContext?: any;
+  commentsToken?: string | null;
+  timestamp?: number;
 }

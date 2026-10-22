@@ -39,6 +39,7 @@ export class ExtractorPanel {
   private isChaptersExpanded = true;
   private isCommentsExpanded = false;
   private commentSortOrder: 'top' | 'newest' = 'top';
+  private commentLimit = 50;
   private includeCommentsInCopy = false;
   private exportIncludeChapters = true;
   private exportIncludeImages = true;
@@ -78,6 +79,7 @@ export class ExtractorPanel {
     if (settings.defaultChaptersExpanded !== undefined) this.isChaptersExpanded = settings.defaultChaptersExpanded;
     if (settings.defaultCommentsExpanded !== undefined) this.isCommentsExpanded = settings.defaultCommentsExpanded;
     if (settings.commentSortOrder !== undefined) this.commentSortOrder = settings.commentSortOrder;
+    if (settings.commentLimit !== undefined) this.commentLimit = settings.commentLimit;
     if (settings.includeCommentsInCopy !== undefined) this.includeCommentsInCopy = settings.includeCommentsInCopy;
     if (settings.exportIncludeChapters !== undefined) this.exportIncludeChapters = settings.exportIncludeChapters;
     if (settings.exportIncludeImages !== undefined) this.exportIncludeImages = settings.exportIncludeImages;
@@ -314,7 +316,7 @@ export class ExtractorPanel {
     // Comments Section HTML
     let commentsSectionHtml = '';
     if (cm) {
-      let commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit}`;
+      let commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit || this.commentLimit}`;
       if (cm.status === 'loading') {
         commentStatusBadge = 'Loading...';
       } else if (cm.status === 'unavailable') {
@@ -322,7 +324,7 @@ export class ExtractorPanel {
       } else if (cm.status === 'failed') {
         commentStatusBadge = 'Failed';
       } else if (cm.status === 'partial') {
-        commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit} (Partial)`;
+        commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit || this.commentLimit} (Partial)`;
       } else if (cm.replyCount > 0) {
         commentStatusBadge += ` (+${cm.replyCount} replies)`;
       }
