@@ -49,7 +49,66 @@ async function runExtractionPipeline(videoId: string, requestId: number): Promis
   const cached = memoryCache.get(videoId, activeSettings.preferredLanguage);
   if (cached) {
     if (requestId === currentRequestId) {
+      let needsCommentExtraction = false;
+
+      if (activeSettings.autoExtractComments) {
+        if (!cached.comments || cached.comments.status === 'not_requested') {
+          needsCommentExtraction = true;
+        } else if (cached.comments.sortOrder !== activeSettings.commentSortOrder) {
+          // Sort order changed: re-extract
+          needsCommentExtraction = true;
+        } else if (activeSettings.commentLimit < cached.comments.threads.length) {
+          // User lowered the comment limit: trim cached result to new limit
+          const trimmed = cached.comments.threads.slice(0, activeSettings.commentLimit);
+          cached.comments = {
+            ...cached.comments,
+            requestedLimit: activeSettings.commentLimit,
+            effectiveLimit: activeSettings.commentLimit,
+            topLevelCount: trimmed.length,
+            replyCount: trimmed.reduce((sum, th) => sum + (th.replies ? th.replies.length : 0), 0),
+            extractedCount: trimmed.length,
+            threads: trimmed,
+            status: 'complete',
+            reason: 'reached_limit'
+          };
+        } else if (activeSettings.commentLimit > cached.comments.threads.length && cached.comments.status !== 'complete') {
+          // User increased the limit and previous extraction didn't finish: schedule additional extraction
+          needsCommentExtraction = true;
+        }
+      }
+
       panel.setResult(cached);
+
+      if (needsCommentExtraction) {
+        panel.setComments({
+          available: false,
+          status: 'loading',
+          sortOrder: activeSettings.commentSortOrder,
+          requestedLimit: activeSettings.commentLimit,
+          effectiveLimit: activeSettings.commentLimit,
+          topLevelCount: 0,
+          replyCount: 0,
+          extractedCount: 0,
+          threads: []
+        });
+
+        extractComments({
+          videoId,
+          limit: activeSettings.commentLimit,
+          sortOrder: activeSettings.commentSortOrder,
+          includeReplies: activeSettings.includeCommentReplies,
+          innertubeApiKey: lastInnertubeApiKey,
+          innertubeContext: lastInnertubeContext
+        }).then((comments) => {
+          if (currentRequestId === requestId || requestId === 0) {
+            cached.comments = comments;
+            memoryCache.set(videoId, cached, activeSettings.preferredLanguage);
+            panel?.setComments(comments);
+          }
+        }).catch((err) => {
+          console.warn('[YT Extractor] Background comment extraction failed:', err);
+        });
+      }
     }
     return;
   }
@@ -122,6 +181,9 @@ async function handleBridgeResponse(detail: any): Promise<void> {
         status: 'loading',
         sortOrder: activeSettings.commentSortOrder,
         requestedLimit: activeSettings.commentLimit,
+        effectiveLimit: activeSettings.commentLimit,
+        topLevelCount: 0,
+        replyCount: 0,
         extractedCount: 0,
         threads: []
       });
@@ -208,6 +270,9 @@ function initPanel(): void {
           status: 'loading',
           sortOrder: newSort,
           requestedLimit: activeSettings.commentLimit,
+          effectiveLimit: activeSettings.commentLimit,
+          topLevelCount: 0,
+          replyCount: 0,
           extractedCount: 0,
           threads: []
         });

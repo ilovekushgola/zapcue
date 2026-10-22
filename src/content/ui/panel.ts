@@ -308,24 +308,34 @@ export class ExtractorPanel {
     // Comments Section HTML
     let commentsSectionHtml = '';
     if (cm) {
-      let commentStatusText = `${cm.extractedCount} loaded`;
-      if (cm.status === 'loading') commentStatusText = 'Loading...';
-      else if (cm.status === 'unavailable') commentStatusText = 'Disabled';
-      else if (cm.status === 'failed') commentStatusText = 'Failed';
+      let commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit}`;
+      if (cm.status === 'loading') {
+        commentStatusBadge = 'Loading...';
+      } else if (cm.status === 'unavailable') {
+        commentStatusBadge = 'Disabled';
+      } else if (cm.status === 'failed') {
+        commentStatusBadge = 'Failed';
+      } else if (cm.status === 'partial') {
+        commentStatusBadge = `${cm.topLevelCount} / ${cm.effectiveLimit} (Partial)`;
+      } else if (cm.replyCount > 0) {
+        commentStatusBadge += ` (+${cm.replyCount} replies)`;
+      }
+
+      const activeSort = cm?.sortOrder || this.commentSortOrder;
 
       commentsSectionHtml = `
         <div class="comments-section">
           <div class="comments-header-row">
             <div class="comments-title-wrap">
               <span>Comments</span>
-              <span class="status-badge">${commentStatusText}</span>
+              <span class="status-badge">${commentStatusBadge}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <select class="comments-sort-select" id="dash-comment-sort">
-                <option value="top" ${this.commentSortOrder === 'top' ? 'selected' : ''}>Top</option>
-                <option value="newest" ${this.commentSortOrder === 'newest' ? 'selected' : ''}>Newest</option>
+              <select class="comments-sort-select" id="dash-comment-sort" title="Comments sort order">
+                <option value="top" ${activeSort === 'top' ? 'selected' : ''}>Top</option>
+                <option value="newest" ${activeSort === 'newest' ? 'selected' : ''}>Newest</option>
               </select>
-              <button class="section-collapse-btn" id="dash-comments-toggle">
+              <button class="section-collapse-btn" id="dash-comments-toggle" title="Toggle comments section visibility">
                 <span>${this.isCommentsExpanded ? 'Hide' : 'Show'}</span>
                 <span class="section-collapse-chevron ${this.isCommentsExpanded ? '' : 'collapsed'}">
                   ${SVG_ICONS.chevronDown}
@@ -334,38 +344,53 @@ export class ExtractorPanel {
             </div>
           </div>
 
+          ${cm.warning ? `
+            <div style="font-size: 11px; color: #e5a50a; padding: 2px 6px; background: rgba(229, 165, 10, 0.1); border-radius: 4px;">
+              ℹ️ ${this.escapeHtml(cm.warning)}
+            </div>
+          ` : ''}
+
           ${this.isCommentsExpanded ? `
             ${cm.status === 'loading' ? `
               <div class="state-box" style="padding: 12px 0;">
                 <div class="spinner"></div>
                 <span>Fetching comment threads in background...</span>
               </div>
+            ` : (cm.status === 'failed' ? `
+              <div class="state-box" style="padding: 12px 0;">
+                <span>⚠️ Failed to load comments: ${this.escapeHtml(cm.error || 'Network error')}</span>
+              </div>
             ` : (cm.threads.length === 0 ? `
               <div class="state-box" style="padding: 12px 0;">
-                <span>${cm.status === 'unavailable' ? 'Comments are disabled for this video.' : 'No comments available.'}</span>
+                <span>${cm.status === 'unavailable' ? 'Comments are disabled for this video.' : 'No comments found.'}</span>
               </div>
             ` : `
               <div class="comments-list">
-                ${cm.threads.map(th => `
+                ${cm.threads.map((th, idx) => `
                   <div class="comment-card">
                     <div class="comment-author-bar">
                       ${th.author.avatarUrl ? `
                         <img src="${this.escapeHtml(th.author.avatarUrl)}" class="comment-author-avatar" alt="Avatar" loading="lazy">
                       ` : ''}
-                      <span class="comment-author-name">${this.escapeHtml(th.author.displayName)}</span>
+                      <span class="comment-author-name">
+                        #${idx + 1} ${this.escapeHtml(th.author.displayName)}
+                      </span>
                       ${th.publishedAt ? `<span class="comment-meta">• ${this.escapeHtml(th.publishedAt)}</span>` : ''}
                     </div>
                     <div class="comment-body">${this.escapeHtml(th.text)}</div>
                     <div class="comment-footer">
                       ${th.likeCount && th.likeCount !== '0' ? `<span>❤️ ${this.escapeHtml(th.likeCount)}</span>` : ''}
                       ${th.replyCount ? `<span>💬 ${th.replyCount} replies</span>` : ''}
+                      <span style="font-size: 10px; color: var(--yt-text-secondary); margin-left: auto;">ID: ${this.escapeHtml(th.id)}</span>
                     </div>
                     ${th.replies && th.replies.length > 0 ? `
                       <div class="comment-replies-list">
-                        ${th.replies.map(r => `
+                        ${th.replies.map((r, rIdx) => `
                           <div class="reply-card">
                             <div class="comment-author-bar">
-                              <span class="comment-author-name" style="font-size: 11px;">${this.escapeHtml(r.author.displayName)}</span>
+                              <span class="comment-author-name" style="font-size: 11px;">
+                                ↳ #${idx + 1}.${rIdx + 1} ${this.escapeHtml(r.author.displayName)}
+                              </span>
                               ${r.publishedAt ? `<span class="comment-meta">• ${this.escapeHtml(r.publishedAt)}</span>` : ''}
                             </div>
                             <div class="comment-body" style="font-size: 11.5px;">${this.escapeHtml(r.text)}</div>
@@ -376,7 +401,7 @@ export class ExtractorPanel {
                   </div>
                 `).join('')}
               </div>
-            `)}
+            `))}
           ` : ''}
         </div>
       `;

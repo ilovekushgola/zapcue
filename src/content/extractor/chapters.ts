@@ -2,7 +2,7 @@ import { ChapterData, ChapterItem } from '../../types';
 import { formatTimestamp, parseTimestampToSeconds } from '../utils/time';
 
 /**
- * Extracts video chapters from YouTube player response markers or video description.
+ * Extracts video chapters from YouTube player response markers, DOM markers, or description timestamps.
  */
 export function extractChapters(playerResponse?: any, description?: string, totalDuration = 0): ChapterData {
   try {
@@ -11,28 +11,47 @@ export function extractChapters(playerResponse?: any, description?: string, tota
     if (markerChapters.length >= 2) {
       return {
         available: true,
+        status: 'detected',
         items: markerChapters
       };
     }
 
-    // 2. Fallback: Parse Timestamps from Video Description
+    // 2. Try DOM Macro Markers
+    const domChapters = extractFromDOM(totalDuration);
+    if (domChapters.length >= 2) {
+      return {
+        available: true,
+        status: 'detected',
+        items: domChapters
+      };
+    }
+
+    // 3. Fallback: Parse Timestamps from Video Description
     if (description) {
       const descChapters = extractFromDescription(description, totalDuration);
       if (descChapters.length >= 2) {
         return {
           available: true,
+          status: 'detected',
           items: descChapters
         };
       }
     }
-  } catch (err) {
-    console.warn('[YT Extractor] Error extracting chapters:', err);
-  }
 
-  return {
-    available: false,
-    items: []
-  };
+    return {
+      available: false,
+      status: 'none_found',
+      items: []
+    };
+  } catch (err: any) {
+    console.warn('[YT Extractor] Error extracting chapters:', err);
+    return {
+      available: false,
+      status: 'failed',
+      items: [],
+      error: err?.message || 'Failed to extract chapters.'
+    };
+  }
 }
 
 /**
@@ -69,9 +88,42 @@ function extractFromPlayerResponse(playerResponse: any, totalDuration: number): 
     }
   }
 
-  // Calculate endSeconds for each chapter
+  // Calculate endSeconds and duration for each chapter
   calculateChapterEndTimes(chapters, totalDuration);
   return chapters;
+}
+
+/**
+ * Parses chapter markers rendered in YouTube DOM engagement panels.
+ */
+function extractFromDOM(totalDuration: number): ChapterItem[] {
+  try {
+    const markers = document.querySelectorAll('ytd-macro-markers-list-item-renderer');
+    if (!markers || markers.length < 2) return [];
+
+    const chapters: ChapterItem[] = [];
+    markers.forEach((m) => {
+      const titleEl = m.querySelector('#details h4, #title');
+      const timeEl = m.querySelector('#time');
+      const title = titleEl?.textContent?.trim() || '';
+      const timeText = timeEl?.textContent?.trim() || '';
+      const startSeconds = parseTimestampToSeconds(timeText);
+      if (title && !isNaN(startSeconds)) {
+        chapters.push({
+          title,
+          startSeconds,
+          startTimestamp: formatTimestamp(startSeconds),
+          source: 'player_markers'
+        });
+      }
+    });
+
+    if (chapters.length >= 2) {
+      calculateChapterEndTimes(chapters, totalDuration);
+      return chapters;
+    }
+  } catch {}
+  return [];
 }
 
 /**
@@ -105,7 +157,6 @@ export function extractFromDescription(description: string, totalDuration: numbe
     }
   }
 
-  // Validate increasing order and at least 2 chapters
   if (rawMatches.length < 2) return [];
 
   const chapters: ChapterItem[] = [];
@@ -131,10 +182,14 @@ export function extractFromDescription(description: string, totalDuration: numbe
 
 function calculateChapterEndTimes(chapters: ChapterItem[], totalDuration: number): void {
   for (let i = 0; i < chapters.length; i++) {
+    let endSec = totalDuration;
     if (i < chapters.length - 1) {
-      chapters[i].endSeconds = chapters[i + 1].startSeconds;
-    } else if (totalDuration > chapters[i].startSeconds) {
-      chapters[i].endSeconds = totalDuration;
+      endSec = chapters[i + 1].startSeconds;
     }
+    chapters[i].endSeconds = endSec;
+    chapters[i].endTimestamp = formatTimestamp(endSec);
+    const duration = Math.max(0, endSec - chapters[i].startSeconds);
+    chapters[i].durationSeconds = duration;
+    chapters[i].formattedDuration = formatTimestamp(duration);
   }
 }

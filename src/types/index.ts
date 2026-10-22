@@ -28,12 +28,17 @@ export interface ChapterItem {
   startSeconds: number;
   startTimestamp: string;
   endSeconds?: number;
+  endTimestamp?: string;
+  durationSeconds?: number;
+  formattedDuration?: string;
   source: 'player_markers' | 'description_timestamps';
 }
 
 export interface ChapterData {
   available: boolean;
+  status: 'detected' | 'none_found' | 'failed';
   items: ChapterItem[];
+  error?: string;
 }
 
 export interface CommentAuthor {
@@ -45,6 +50,7 @@ export interface CommentAuthor {
 export interface CommentItem {
   id: string;
   videoId: string;
+  parentCommentId?: string;
   text: string;
   author: CommentAuthor;
   publishedAt?: string;
@@ -60,9 +66,14 @@ export interface CommentData {
   status: 'complete' | 'partial' | 'loading' | 'unavailable' | 'failed' | 'not_requested';
   sortOrder: 'top' | 'newest';
   requestedLimit: number;
+  effectiveLimit: number;
+  topLevelCount: number;
+  replyCount: number;
   extractedCount: number;
   threads: CommentItem[];
   error?: string;
+  reason?: string;
+  warning?: string;
 }
 
 export interface TranscriptSegment {

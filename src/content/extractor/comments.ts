@@ -10,7 +10,8 @@ export interface CommentExtractionOptions {
 }
 
 /**
- * Extracts comment threads for the current YouTube video asynchronously.
+ * Extracts comment threads for the current YouTube video with strict cap enforcement,
+ * separate reply counting, verified sorting, and deduplication.
  */
 export async function extractComments(options: CommentExtractionOptions): Promise<CommentData> {
   const {
@@ -22,81 +23,148 @@ export async function extractComments(options: CommentExtractionOptions): Promis
     innertubeContext
   } = options;
 
-  if (limit <= 0) {
+  const effectiveLimit = Math.max(0, Math.min(isNaN(limit) ? 50 : limit, 500));
+
+  if (effectiveLimit === 0) {
     return {
       available: false,
       status: 'not_requested',
       sortOrder,
       requestedLimit: limit,
+      effectiveLimit: 0,
+      topLevelCount: 0,
+      replyCount: 0,
       extractedCount: 0,
-      threads: []
+      threads: [],
+      reason: 'not_requested'
     };
   }
+
+  const seenIds = new Set<string>();
+  const allThreads: CommentItem[] = [];
+  let sortWarning: string | undefined;
+  let effectiveSort: 'top' | 'newest' = sortOrder;
+  let statusReason = 'unknown';
 
   try {
     // 1. Try Innertube API via YouTube internal endpoint
     if (innertubeApiKey && innertubeContext) {
       const apiResult = await fetchCommentsViaInnertube(
         videoId,
-        limit,
+        effectiveLimit,
         sortOrder,
         includeReplies,
         innertubeApiKey,
-        innertubeContext
+        innertubeContext,
+        seenIds
       );
-      if (apiResult && apiResult.threads.length > 0) {
-        return apiResult;
+
+      if (apiResult) {
+        effectiveSort = apiResult.effectiveSort;
+        sortWarning = apiResult.sortWarning;
+        statusReason = apiResult.reason;
+
+        for (const th of apiResult.threads) {
+          if (allThreads.length < effectiveLimit && !seenIds.has(th.id)) {
+            seenIds.add(th.id);
+            allThreads.push(th);
+          }
+        }
       }
     }
 
-    // 2. Fallback: Parse visible comment threads from YouTube DOM
-    const domResult = extractCommentsFromDOM(videoId, limit, includeReplies);
-    if (domResult.threads.length > 0) {
-      return {
-        available: true,
-        status: domResult.threads.length >= limit ? 'complete' : 'partial',
-        sortOrder,
-        requestedLimit: limit,
-        extractedCount: domResult.threads.length,
-        threads: domResult.threads
-      };
+    // 2. Supplement or Fallback with DOM comments if we haven't reached the limit
+    if (allThreads.length < effectiveLimit) {
+      const domThreads = extractCommentsFromDOM(videoId, effectiveLimit - allThreads.length, includeReplies, seenIds);
+      for (const th of domThreads) {
+        if (allThreads.length < effectiveLimit && !seenIds.has(th.id)) {
+          seenIds.add(th.id);
+          allThreads.push(th);
+        }
+      }
     }
+
+    // Strict Hard-Cap Slicing: Output can NEVER exceed effectiveLimit
+    const finalThreads = allThreads.slice(0, effectiveLimit);
+    const topLevelCount = finalThreads.length;
+    const totalReplies = finalThreads.reduce((sum, th) => sum + (th.replies ? th.replies.length : 0), 0);
+
+    // Determine honest, truthful extraction status
+    let finalStatus: CommentData['status'] = 'complete';
+    if (topLevelCount === 0) {
+      if (statusReason === 'comments_disabled') {
+        finalStatus = 'unavailable';
+      } else if (statusReason === 'network_error') {
+        finalStatus = 'failed';
+      } else {
+        finalStatus = 'complete';
+        statusReason = 'zero_comments';
+      }
+    } else if (topLevelCount >= effectiveLimit) {
+      finalStatus = 'complete';
+      statusReason = 'reached_limit';
+    } else {
+      // Returned fewer than requested limit
+      if (statusReason === 'all_available_extracted' || statusReason === 'zero_comments') {
+        finalStatus = 'complete';
+      } else {
+        finalStatus = 'partial';
+        if (statusReason === 'unknown') {
+          statusReason = 'pagination_interrupted';
+        }
+      }
+    }
+
+    return {
+      available: topLevelCount > 0,
+      status: finalStatus,
+      sortOrder: effectiveSort,
+      requestedLimit: limit,
+      effectiveLimit,
+      topLevelCount,
+      replyCount: totalReplies,
+      extractedCount: topLevelCount,
+      threads: finalThreads,
+      reason: statusReason,
+      warning: sortWarning
+    };
   } catch (err: any) {
     console.warn('[YT Extractor] Comments extraction error:', err);
     return {
-      available: false,
-      status: 'failed',
-      sortOrder,
+      available: allThreads.length > 0,
+      status: allThreads.length > 0 ? 'partial' : 'failed',
+      sortOrder: effectiveSort,
       requestedLimit: limit,
-      extractedCount: 0,
-      threads: [],
-      error: err?.message || 'Failed to extract comments.'
+      effectiveLimit,
+      topLevelCount: allThreads.length,
+      replyCount: allThreads.reduce((sum, th) => sum + (th.replies ? th.replies.length : 0), 0),
+      extractedCount: allThreads.length,
+      threads: allThreads.slice(0, effectiveLimit),
+      error: err?.message || 'Failed to extract comments.',
+      reason: 'network_error',
+      warning: sortWarning
     };
   }
-
-  return {
-    available: false,
-    status: 'unavailable',
-    sortOrder,
-    requestedLimit: limit,
-    extractedCount: 0,
-    threads: []
-  };
 }
 
 /**
- * Queries YouTube's internal /youtubei/v1/next endpoint to fetch comment threads.
+ * Queries YouTube's internal /youtubei/v1/next endpoint with pagination and sort verification.
  */
 async function fetchCommentsViaInnertube(
   videoId: string,
-  limit: number,
-  sortOrder: 'top' | 'newest',
+  effectiveLimit: number,
+  requestedSort: 'top' | 'newest',
   includeReplies: boolean,
   apiKey: string,
-  context: any
-): Promise<CommentData | null> {
+  context: any,
+  seenIds: Set<string>
+): Promise<{
+  threads: CommentItem[];
+  effectiveSort: 'top' | 'newest';
+  sortWarning?: string;
+  reason: string;
+} | null> {
   try {
-    // Step 1: Initial next query to obtain comments continuation token
     const initialUrl = `https://www.youtube.com/youtubei/v1/next?key=${apiKey}`;
     const initialRes = await fetch(initialUrl, {
       method: 'POST',
@@ -105,18 +173,31 @@ async function fetchCommentsViaInnertube(
       credentials: 'include'
     });
 
-    if (!initialRes.ok) return null;
+    if (!initialRes.ok) {
+      return { threads: [], effectiveSort: requestedSort, reason: 'network_error' };
+    }
+
     const initialData = await initialRes.json();
 
-    // Locate comments continuation token in engagement panels or itemSectionRenderers
-    let token = findCommentsContinuationToken(initialData);
-    if (!token) return null;
+    // Check if comments are disabled
+    if (isCommentsDisabled(initialData)) {
+      return { threads: [], effectiveSort: requestedSort, reason: 'comments_disabled' };
+    }
 
-    // Step 2: Fetch comment threads
+    // Locate initial comments continuation token
+    let token = findCommentsContinuationToken(initialData);
+    if (!token) {
+      return { threads: [], effectiveSort: requestedSort, reason: 'zero_comments' };
+    }
+
     const threads: CommentItem[] = [];
     let currentToken: string | null = token;
+    let effectiveSort: 'top' | 'newest' = 'top';
+    let sortWarning: string | undefined;
+    let isFirstBatch = true;
+    let allAvailableExtracted = false;
 
-    while (currentToken && threads.length < limit) {
+    while (currentToken && threads.length < effectiveLimit) {
       const contRes = await fetch(initialUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,36 +208,74 @@ async function fetchCommentsViaInnertube(
       if (!contRes.ok) break;
       const contData = await contRes.json();
 
-      // If sortOrder === 'newest', check if we need to switch continuation token from the sort menu
-      if (sortOrder === 'newest' && threads.length === 0) {
-        const newestToken = findNewestSortToken(contData);
-        if (newestToken && newestToken !== currentToken) {
-          currentToken = newestToken;
-          continue;
+      // On first batch, inspect the sort menu if user requested newest comments
+      if (isFirstBatch) {
+        isFirstBatch = false;
+        const sortInfo = findSortMenuTokens(contData);
+        if (requestedSort === 'newest') {
+          if (sortInfo.newestToken) {
+            effectiveSort = 'newest';
+            if (sortInfo.newestToken !== currentToken) {
+              currentToken = sortInfo.newestToken;
+              continue; // Re-fetch with verified newest token
+            }
+          } else {
+            effectiveSort = 'top';
+            sortWarning = 'Requested newest sort is not supported for this video; defaulted to top comments.';
+          }
+        } else {
+          effectiveSort = 'top';
         }
       }
 
       const { newThreads, nextContinuation } = parseCommentSectionData(contData, videoId, includeReplies);
+
       for (const th of newThreads) {
-        threads.push(th);
-        if (threads.length >= limit) break;
+        if (!seenIds.has(th.id) && threads.length < effectiveLimit) {
+          seenIds.add(th.id);
+          threads.push(th);
+        }
+      }
+
+      if (!nextContinuation) {
+        allAvailableExtracted = true;
+        break;
       }
 
       currentToken = nextContinuation;
     }
 
     return {
-      available: threads.length > 0,
-      status: threads.length >= limit ? 'complete' : (threads.length > 0 ? 'partial' : 'unavailable'),
-      sortOrder,
-      requestedLimit: limit,
-      extractedCount: threads.length,
-      threads
+      threads: threads.slice(0, effectiveLimit),
+      effectiveSort,
+      sortWarning,
+      reason: threads.length >= effectiveLimit ? 'reached_limit' : (allAvailableExtracted ? 'all_available_extracted' : 'pagination_interrupted')
     };
   } catch (e) {
-    console.warn('[YT Extractor] Innertube comments query failed:', e);
+    console.warn('[YT Extractor] Innertube fetch failed:', e);
     return null;
   }
+}
+
+/**
+ * Checks if comments are explicitly disabled on the video.
+ */
+function isCommentsDisabled(data: any): boolean {
+  try {
+    const panels = data?.engagementPanels || [];
+    for (const p of panels) {
+      const target = p?.engagementPanelSectionListRenderer?.targetId;
+      if (target === 'engagement-panel-comments-disabled') {
+        return true;
+      }
+    }
+
+    const jsonStr = JSON.stringify(data);
+    if (jsonStr.includes('Comments are turned off') || jsonStr.includes('comments-disabled')) {
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 /**
@@ -188,18 +307,39 @@ function findCommentsContinuationToken(data: any): string | null {
 }
 
 /**
- * Finds continuation token for 'Newest first' comments sort.
+ * Inspects sortFilterSubMenuRenderer to extract and verify Top vs Newest continuation tokens.
  */
-function findNewestSortToken(data: any): string | null {
+export function findSortMenuTokens(data: any): { topToken?: string; newestToken?: string } {
+  const result: { topToken?: string; newestToken?: string } = {};
   try {
-    const endpoints = JSON.stringify(data).match(/"continuation":"([^"]+)"/g) || [];
-    // If multiple continuations exist, the second continuation usually points to newest comments
-    if (endpoints.length > 1) {
-      const match = endpoints[1].match(/"continuation":"([^"]+)"/);
-      if (match) return match[1];
+    const findSubMenu = (obj: any): any => {
+      if (!obj || typeof obj !== 'object') return null;
+      if (obj.sortFilterSubMenuRenderer) return obj.sortFilterSubMenuRenderer;
+      for (const k of Object.keys(obj)) {
+        if (typeof obj[k] === 'object') {
+          const res = findSubMenu(obj[k]);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const subMenu = findSubMenu(data);
+    if (subMenu?.subMenuItems && Array.isArray(subMenu.subMenuItems)) {
+      for (const item of subMenu.subMenuItems) {
+        const title = (item.title || '').toLowerCase();
+        const token = item.serviceEndpoint?.continuationEndpoint?.continuationCommand?.token;
+        if (token) {
+          if (title.includes('newest') || title.includes('new')) {
+            result.newestToken = token;
+          } else if (title.includes('top') || title.includes('popular')) {
+            result.topToken = token;
+          }
+        }
+      }
     }
   } catch {}
-  return null;
+  return result;
 }
 
 /**
@@ -213,14 +353,13 @@ export function parseCommentSectionData(data: any, videoId: string, includeRepli
   let nextContinuation: string | null = null;
 
   try {
-    // Actions or Framework updates or sectionList
     const endpoints = data?.onResponseReceivedEndpoints || [];
     for (const ep of endpoints) {
       const actionItems = ep?.appendContinuationItemsAction?.continuationItems ||
                           ep?.reloadContinuationItemsCommand?.continuationItems || [];
 
       for (const item of actionItems) {
-        // Next continuation
+        // Next continuation token
         if (item?.continuationItemRenderer) {
           nextContinuation = item.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || null;
           continue;
@@ -234,7 +373,7 @@ export function parseCommentSectionData(data: any, videoId: string, includeRepli
             if (includeReplies && thread.replies?.commentRepliesRenderer?.contents) {
               topComment.replies = [];
               for (const r of thread.replies.commentRepliesRenderer.contents) {
-                const replyObj = parseCommentRenderer(r?.commentRenderer, videoId);
+                const replyObj = parseCommentRenderer(r?.commentRenderer, videoId, topComment.id);
                 if (replyObj) topComment.replies.push(replyObj);
               }
             }
@@ -253,7 +392,7 @@ export function parseCommentSectionData(data: any, videoId: string, includeRepli
 /**
  * Extracts CommentItem from an individual commentRenderer object.
  */
-export function parseCommentRenderer(renderer: any, videoId: string): CommentItem | null {
+export function parseCommentRenderer(renderer: any, videoId: string, parentCommentId?: string): CommentItem | null {
   if (!renderer) return null;
 
   const id = renderer.commentId || '';
@@ -280,6 +419,7 @@ export function parseCommentRenderer(renderer: any, videoId: string): CommentIte
   return {
     id,
     videoId,
+    parentCommentId,
     text,
     author: {
       displayName: authorName,
@@ -295,11 +435,14 @@ export function parseCommentRenderer(renderer: any, videoId: string): CommentIte
 }
 
 /**
- * Fallback: Extracts comments from YouTube DOM elements when already rendered on page.
+ * Fallback: Extracts comments from YouTube DOM elements with hard cap and deduplication.
  */
-export function extractCommentsFromDOM(videoId: string, limit: number, includeReplies: boolean): {
-  threads: CommentItem[];
-} {
+export function extractCommentsFromDOM(
+  videoId: string,
+  limit: number,
+  includeReplies: boolean,
+  seenIds: Set<string>
+): CommentItem[] {
   const threads: CommentItem[] = [];
   try {
     const commentEls = document.querySelectorAll('ytd-comment-thread-renderer');
@@ -317,10 +460,12 @@ export function extractCommentsFromDOM(videoId: string, limit: number, includeRe
       const text = contentEl?.textContent?.trim() || '';
       const publishedAt = timeEl?.textContent?.trim() || undefined;
       const likeCount = likesEl?.textContent?.trim() || '0';
+      const commentId = el.getAttribute('id') || `dom-comment-${i}`;
 
-      if (text) {
+      if (text && !seenIds.has(commentId)) {
+        seenIds.add(commentId);
         const item: CommentItem = {
-          id: `dom-comment-${i}`,
+          id: commentId,
           videoId,
           text,
           author: {
@@ -343,8 +488,9 @@ export function extractCommentsFromDOM(videoId: string, limit: number, includeRe
               const rText = rEl.querySelector('#content-text')?.textContent?.trim() || '';
               if (rText) {
                 item.replies.push({
-                  id: `dom-reply-${i}-${j}`,
+                  id: `${commentId}-reply-${j}`,
                   videoId,
+                  parentCommentId: commentId,
                   text: rText,
                   author: { displayName: rAuthor }
                 });
@@ -360,5 +506,5 @@ export function extractCommentsFromDOM(videoId: string, limit: number, includeRe
     console.warn('[YT Extractor] Error parsing DOM comments:', e);
   }
 
-  return { threads };
+  return threads.slice(0, limit);
 }
