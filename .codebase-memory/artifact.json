@@ -1,12 +1,12 @@
 {
     "schema_version": 2,
-    "commit": "da50cde2ad6fa007e1fc2d5d57def8238f788bea",
-    "indexed_at": "2026-10-22T02:56:26Z",
+    "commit": "fdef0616be8ca05e1757ddeaf64092031aec0921",
+    "indexed_at": "2026-10-22T03:29:01Z",
     "project": "zapcue",
-    "nodes": 397,
-    "edges": 857,
-    "original_size": 3473408,
-    "compressed_size": 462619,
+    "nodes": 405,
+    "edges": 891,
+    "original_size": 3604480,
+    "compressed_size": 484404,
     "compression_level": 9,
     "reconcile_basis": "git-clean-head"
 }
