@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "6bfc01b2fcfe07405dd6242f7f354c28dba536e8",
+    "indexed_at": "2026-10-22T01:38:30Z",
+    "project": "zapcue",
+    "nodes": 314,
+    "edges": 601,
+    "original_size": 3276800,
+    "compressed_size": 350770,
+    "compression_level": 9
+}

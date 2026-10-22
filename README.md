@@ -36,7 +36,7 @@ Instead of annoying floating overlays or complex cloud services, **Zapcue embeds
 
 - **⚡ Sub-Second Extraction (<20ms Metadata, ~200ms Transcript):**
   Uses an in-memory MAIN-world bridge communicating directly with YouTube's internal `movie_player` API and player response cache. Zero third-party servers, zero external HTTP dependencies.
-  
+
 - **🎯 Embedded YouTube Native Sidebar (Zero Floating Popups):**
   Neatly injected directly above related videos in YouTube's right column (`#secondary-inner`). Looks and feels like a native YouTube component with smooth drawer behavior.
 
@@ -51,6 +51,7 @@ Instead of annoying floating overlays or complex cloud services, **Zapcue embeds
 
 - **⏱️ Timestamp Toggle (Timestamps vs Continuous Text):**
   Switch between:
+  
   - **Timestamps ON:** Clickable timestamp pills (`[00:15]`) that instantly seek the YouTube video player to that second.
   - **Timestamps OFF:** Clean, continuous paragraph text view for comfortable reading and distraction-free copying.
 
@@ -58,6 +59,7 @@ Instead of annoying floating overlays or complex cloud services, **Zapcue embeds
   Copies the entire extracted video package in one click — Video Title, Channel, Stats, URL, Description, and the complete Transcript (smartly formatted with or without timestamps according to your toggle).
 
 - **⬇️ Split Export Button (Markdown, JSON, Plain Text):**
+  
   - **Instant Click:** Downloads formatted Markdown (`.md`) ready for Obsidian, Notion, and Logseq.
   - **Caret Dropdown (`▾`):** Choose between Markdown (`.md`), structured JSON (`.json`), or Plain Text (`.txt`).
 
@@ -72,6 +74,7 @@ Instead of annoying floating overlays or complex cloud services, **Zapcue embeds
 ## 📸 Component Showcase & Prototypes
 
 The project includes standalone design prototypes inside `prototypes/`:
+
 - **`prototypes/index.html`:** Interactive 2-column YouTube layout simulator featuring live tab switching.
 - **`prototypes/prototype-7-youtube-sidebar-native.html`:** The official final drawer layout matching YouTube's native design tokens.
 - **`prototypes/logo-preview.html`:** Vector showcase of the hand-drawn doodle logo across light/dark themes and multiple icon resolutions.
@@ -83,27 +86,33 @@ The project includes standalone design prototypes inside `prototypes/`:
 ### Load Unpacked in Chrome, Brave, Edge, or Opera:
 
 1. **Clone or download this repository:**
+   
    ```bash
    git clone https://github.com/ilovekushgola/zapcue.git
    cd zapcue
    ```
 
 2. **Install dependencies and compile:**
+   
    ```bash
    npm install
    npm run build
    ```
+   
    *(This builds the production-ready extension into the `dist/` folder in under 2 seconds).*
 
 3. **Open Chrome Extensions Manager:**
+   
    - In Chrome, navigate to `chrome://extensions/`
    - Enable **Developer mode** toggle in the top-right corner.
 
 4. **Load the Extension:**
+   
    - Click the **Load unpacked** button (top-left).
    - Select the `dist/` folder inside the `zapcue` directory.
 
 5. **Test on YouTube:**
+   
    - Open any YouTube video (e.g., `https://www.youtube.com/watch?v=...`) or Shorts.
    - The Zapcue Drawer will appear in the right column above recommended videos!
 
@@ -150,6 +159,7 @@ zapcue/
 ```
 
 ### Multi-Stage Transcript Extraction Cascade:
+
 1. **DOM Scrape:** Inspects `ytd-transcript-segment-renderer` if transcript is already open.
 2. **Programmatic Trigger:** Clicks YouTube's native "Show transcript" button in the description section to fetch authentic captions without triggering anti-bot hurdles.
 3. **Internal `timedtext` API:** Parses JSON3 caption track events with credentials included.
@@ -159,6 +169,7 @@ zapcue/
 ## 📊 Export Formats
 
 ### 1. Markdown (`.md`)
+
 ```markdown
 # China's AX8860 AI Chip vs NVIDIA DGX Spark
 
@@ -185,6 +196,7 @@ zapcue/
 ```
 
 ### 2. JSON (`.json`)
+
 ```json
 {
   "extractedAt": "2026-10-21T21:46:05.000Z",
@@ -223,6 +235,7 @@ zapcue/
 ```
 
 ### 3. Plain Text (`.txt`)
+
 ```text
 ======================================================================
 TITLE:       China's AX8860 AI Chip vs NVIDIA DGX Spark
@@ -249,11 +262,13 @@ The Axera AX8860 is making headlines...
 ## 🧪 Testing & Verification
 
 Run the built-in test suite:
+
 ```bash
 npm test
 ```
 
 ### Test Coverage (11/11 Passing):
+
 - **Group 1:** Distribution & Manifest V3 structure validation.
 - **Group 2:** Time math (`MM:SS`, `HH:MM:SS`) & compact view count conversions.
 - **Group 3:** HTML entity decoding without text corruption.
