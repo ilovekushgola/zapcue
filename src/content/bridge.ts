@@ -63,12 +63,24 @@
       const playerResponse = getPlayerResponse(videoId);
 
       if (playerResponse || attempts >= maxAttempts) {
+        let innertubeApiKey = '';
+        let innertubeContext: any = null;
+        try {
+          const ytcfg = (window as any).ytcfg;
+          if (typeof ytcfg?.get === 'function') {
+            innertubeApiKey = ytcfg.get('INNERTUBE_API_KEY') || '';
+            innertubeContext = ytcfg.get('INNERTUBE_CONTEXT') || null;
+          }
+        } catch {}
+
         window.dispatchEvent(
           new CustomEvent('__YT_EXTRACTOR_RESPONSE__', {
             detail: {
               requestId,
               videoId,
               playerResponse,
+              innertubeApiKey,
+              innertubeContext,
               timestamp: Date.now()
             }
           })

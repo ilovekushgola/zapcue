@@ -1,4 +1,4 @@
-import { ExtractorResult } from '../../types';
+import { ChapterData, CommentData, ExtractorResult, ZapcueSettings } from '../../types';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { downloadFile, sanitizeFilename, toJSON, toMarkdown, toTXT } from '../utils/export';
 import { ZAPCUE_LOGO_DATA_URI } from './mascot-data';
@@ -8,6 +8,7 @@ import panelStyles from './styles.css?inline';
 export interface PanelCallbacks {
   onManualExtract: () => void;
   onAutoExtractToggle: (enabled: boolean) => void;
+  onCommentSortChange?: (sort: 'top' | 'newest') => void;
 }
 
 // Crisp Vector SVGs (ui-ux-pro-max standard - zero emojis)
@@ -17,6 +18,7 @@ const SVG_ICONS = {
   copy: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   download: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   chevronDown: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`,
+  chevronRight: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>`,
   search: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
 };
 
@@ -30,6 +32,15 @@ export class ExtractorPanel {
   private searchQuery = '';
   private isDescriptionExpanded = false;
   private isExportMenuOpen = false;
+
+  // ZapCue 2.0 Part 1 Configurable Layout State
+  private showThumbnailPreview = true;
+  private isTranscriptExpanded = true;
+  private isChaptersExpanded = true;
+  private isCommentsExpanded = false;
+  private commentSortOrder: 'top' | 'newest' = 'top';
+  private includeCommentsInCopy = false;
+
   private callbacks: PanelCallbacks;
   private toastTimer: any = null;
 
@@ -57,6 +68,17 @@ export class ExtractorPanel {
     });
   }
 
+  setSettings(settings: Partial<ZapcueSettings>): void {
+    if (settings.autoExtract !== undefined) this.autoExtract = settings.autoExtract;
+    if (settings.showThumbnailPreview !== undefined) this.showThumbnailPreview = settings.showThumbnailPreview;
+    if (settings.defaultTranscriptExpanded !== undefined) this.isTranscriptExpanded = settings.defaultTranscriptExpanded;
+    if (settings.defaultChaptersExpanded !== undefined) this.isChaptersExpanded = settings.defaultChaptersExpanded;
+    if (settings.defaultCommentsExpanded !== undefined) this.isCommentsExpanded = settings.defaultCommentsExpanded;
+    if (settings.commentSortOrder !== undefined) this.commentSortOrder = settings.commentSortOrder;
+    if (settings.includeCommentsInCopy !== undefined) this.includeCommentsInCopy = settings.includeCommentsInCopy;
+    this.render();
+  }
+
   setAutoExtract(enabled: boolean): void {
     this.autoExtract = enabled;
     this.render();
@@ -74,6 +96,20 @@ export class ExtractorPanel {
     this.isDescriptionExpanded = false;
     this.isExportMenuOpen = false;
     this.render();
+  }
+
+  setChapters(chapters: ChapterData): void {
+    if (this.result) {
+      this.result.chapters = chapters;
+      this.render();
+    }
+  }
+
+  setComments(comments: CommentData): void {
+    if (this.result) {
+      this.result.comments = comments;
+      this.render();
+    }
   }
 
   private showToast(msg: string): void {
@@ -168,15 +204,17 @@ export class ExtractorPanel {
 
     const m = this.result?.metadata;
     const t = this.result?.transcript;
+    const ch = this.result?.chapters;
+    const cm = this.result?.comments;
 
-    // Filter segments based on real-time search
+    // Filter transcript segments based on real-time search
     const filteredSegments = t?.available && t.segments.length > 0
       ? (this.searchQuery.trim()
           ? t.segments.filter(s => s.text.toLowerCase().includes(this.searchQuery.toLowerCase()))
           : t.segments)
       : [];
 
-    // Format views, likes, and dates for stats row
+    // Format views, likes, and dates for stats row (ZERO fabricated values)
     const viewsDisplay = m ? this.formatViews(m.viewCount) : '0';
     const likesDisplay = m?.likeCount && m.likeCount !== 'N/A' ? m.likeCount : 'N/A';
     const dateInfo = this.parseUploadDate(m?.uploadDate);
@@ -187,9 +225,8 @@ export class ExtractorPanel {
     const firstParagraph = descParagraphs.length > 0 ? descParagraphs[0] : 'No description provided for this video.';
     const remainingParagraphs = descParagraphs.slice(1);
 
-    // Dynamic Transcript Area
+    // Dynamic Transcript Body
     let transcriptBodyHtml = '';
-
     if (this.isLoading) {
       transcriptBodyHtml = `
         <div class="state-box">
@@ -214,7 +251,6 @@ export class ExtractorPanel {
           </div>
         `;
       } else if (this.showTimestamps) {
-        // Mode A: With Timestamps (clickable badges jump to timestamp)
         transcriptBodyHtml = filteredSegments.map(seg => `
           <div class="segment-row" data-start="${seg.start}">
             <span class="time-badge">${seg.timestamp}</span>
@@ -222,7 +258,6 @@ export class ExtractorPanel {
           </div>
         `).join('');
       } else {
-        // Mode B: Without Timestamps (Continuous clean paragraph reading mode)
         transcriptBodyHtml = `
           <div class="paragraph-view">
             ${filteredSegments.map(seg => `
@@ -239,12 +274,120 @@ export class ExtractorPanel {
       `;
     }
 
+    // Chapters Section HTML (if available)
+    let chaptersSectionHtml = '';
+    if (ch?.available && ch.items.length > 0) {
+      chaptersSectionHtml = `
+        <div class="chapters-section">
+          <div class="chapters-header">
+            <div class="chapters-title-wrap">
+              <span>Chapters</span>
+              <span class="status-badge">${ch.items.length} detected</span>
+            </div>
+            <button class="section-collapse-btn" id="dash-chapters-toggle">
+              <span>${this.isChaptersExpanded ? 'Hide' : 'Show'}</span>
+              <span class="section-collapse-chevron ${this.isChaptersExpanded ? '' : 'collapsed'}">
+                ${SVG_ICONS.chevronDown}
+              </span>
+            </button>
+          </div>
+          ${this.isChaptersExpanded ? `
+            <div class="chapters-list">
+              ${ch.items.map(item => `
+                <div class="chapter-row" data-start="${item.startSeconds}">
+                  <span class="time-badge">${item.startTimestamp}</span>
+                  <span class="chapter-title" title="${this.escapeHtml(item.title)}">${this.escapeHtml(item.title)}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Comments Section HTML
+    let commentsSectionHtml = '';
+    if (cm) {
+      let commentStatusText = `${cm.extractedCount} loaded`;
+      if (cm.status === 'loading') commentStatusText = 'Loading...';
+      else if (cm.status === 'unavailable') commentStatusText = 'Disabled';
+      else if (cm.status === 'failed') commentStatusText = 'Failed';
+
+      commentsSectionHtml = `
+        <div class="comments-section">
+          <div class="comments-header-row">
+            <div class="comments-title-wrap">
+              <span>Comments</span>
+              <span class="status-badge">${commentStatusText}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <select class="comments-sort-select" id="dash-comment-sort">
+                <option value="top" ${this.commentSortOrder === 'top' ? 'selected' : ''}>Top</option>
+                <option value="newest" ${this.commentSortOrder === 'newest' ? 'selected' : ''}>Newest</option>
+              </select>
+              <button class="section-collapse-btn" id="dash-comments-toggle">
+                <span>${this.isCommentsExpanded ? 'Hide' : 'Show'}</span>
+                <span class="section-collapse-chevron ${this.isCommentsExpanded ? '' : 'collapsed'}">
+                  ${SVG_ICONS.chevronDown}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          ${this.isCommentsExpanded ? `
+            ${cm.status === 'loading' ? `
+              <div class="state-box" style="padding: 12px 0;">
+                <div class="spinner"></div>
+                <span>Fetching comment threads in background...</span>
+              </div>
+            ` : (cm.threads.length === 0 ? `
+              <div class="state-box" style="padding: 12px 0;">
+                <span>${cm.status === 'unavailable' ? 'Comments are disabled for this video.' : 'No comments available.'}</span>
+              </div>
+            ` : `
+              <div class="comments-list">
+                ${cm.threads.map(th => `
+                  <div class="comment-card">
+                    <div class="comment-author-bar">
+                      ${th.author.avatarUrl ? `
+                        <img src="${this.escapeHtml(th.author.avatarUrl)}" class="comment-author-avatar" alt="Avatar" loading="lazy">
+                      ` : ''}
+                      <span class="comment-author-name">${this.escapeHtml(th.author.displayName)}</span>
+                      ${th.publishedAt ? `<span class="comment-meta">• ${this.escapeHtml(th.publishedAt)}</span>` : ''}
+                    </div>
+                    <div class="comment-body">${this.escapeHtml(th.text)}</div>
+                    <div class="comment-footer">
+                      ${th.likeCount && th.likeCount !== '0' ? `<span>❤️ ${this.escapeHtml(th.likeCount)}</span>` : ''}
+                      ${th.replyCount ? `<span>💬 ${th.replyCount} replies</span>` : ''}
+                    </div>
+                    ${th.replies && th.replies.length > 0 ? `
+                      <div class="comment-replies-list">
+                        ${th.replies.map(r => `
+                          <div class="reply-card">
+                            <div class="comment-author-bar">
+                              <span class="comment-author-name" style="font-size: 11px;">${this.escapeHtml(r.author.displayName)}</span>
+                              ${r.publishedAt ? `<span class="comment-meta">• ${this.escapeHtml(r.publishedAt)}</span>` : ''}
+                            </div>
+                            <div class="comment-body" style="font-size: 11.5px;">${this.escapeHtml(r.text)}</div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `)}
+          ` : ''}
+        </div>
+      `;
+    }
+
     // Render Full Native YouTube Drawer Component
     this.shadowRoot.innerHTML = `
       <style>${panelStyles}</style>
       <div class="yt-native-panel">
 
-        <!-- 1. Header: Video Title + Close Button -->
+        <!-- 1. Header: Video Title + Auto-extract + Close Button -->
         <div class="panel-header">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
             <img src="${ZAPCUE_LOGO_DATA_URI}" width="24" height="24" alt="Zapcue Mascot" style="flex-shrink: 0; display: block;">
@@ -261,20 +404,41 @@ export class ExtractorPanel {
           </div>
         </div>
 
-        <!-- 2. Channel Row with Channel Logo (Avatar) -->
+        <!-- 2. Video Thumbnail Preview (16:9 Compact) -->
+        ${this.showThumbnailPreview && m?.thumbnailUrl ? `
+          <div class="thumbnail-preview-container">
+            <img
+              src="${this.escapeHtml(m.thumbnailUrl)}"
+              alt="${this.escapeHtml(m.title || 'Thumbnail')}"
+              class="thumbnail-preview-img"
+              loading="lazy"
+              id="dash-thumb-img"
+            />
+            <div class="thumbnail-placeholder" id="dash-thumb-placeholder" style="display: none;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="4"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>
+              <span>Thumbnail unavailable</span>
+            </div>
+            ${m?.formattedDuration ? `<span class="thumbnail-duration-badge">${this.escapeHtml(m.formattedDuration)}</span>` : ''}
+          </div>
+        ` : ''}
+
+        <!-- 3. Channel Row with Channel Logo & Subscriber Count -->
         <div class="channel-row">
           <div class="channel-avatar">
             ${m?.channelAvatarUrl
-              ? `<img src="${m.channelAvatarUrl}" alt="${this.escapeHtml(m.channelName || '')}">`
+              ? `<img src="${this.escapeHtml(m.channelAvatarUrl)}" alt="${this.escapeHtml(m.channelName || '')}" onerror="this.style.display='none'">`
               : `<svg viewBox="0 0 100 100" width="36" height="36"><rect width="100" height="100" fill="#000"/><text x="50" y="65" font-size="44" font-weight="bold" fill="#fff" text-anchor="middle">${(m?.channelName || 'Y')[0].toUpperCase()}</text></svg>`
             }
           </div>
           <div class="channel-info">
             <div class="channel-name">${this.escapeHtml(m?.channelName || 'YouTube Creator')}</div>
+            ${m?.subscriberInfo?.displayText && m.subscriberInfo.displayText !== 'Unavailable'
+              ? `<div class="channel-subscribers">${this.escapeHtml(m.subscriberInfo.displayText)}</div>`
+              : ''}
           </div>
         </div>
 
-        <!-- 3. Three-Column Stats Row (Likes, Views, Date) -->
+        <!-- 4. Three-Column Stats Row (Likes, Views, Date) -->
         <div class="stats-row">
           <div class="stat-col">
             <span class="stat-value">${likesDisplay}</span>
@@ -290,11 +454,10 @@ export class ExtractorPanel {
           </div>
         </div>
 
-        <!-- 4. Description Card (Collapsible) -->
+        <!-- 5. Description Card (Collapsible) -->
         <div class="desc-card">
           <div class="desc-text">
             <p>${this.escapeHtml(firstParagraph)}</p>
-            
             ${remainingParagraphs.length > 0 ? `
               <div class="desc-collapsible ${this.isDescriptionExpanded ? 'expanded' : ''}" id="dash-desc-collapsible">
                 ${remainingParagraphs.map(p => {
@@ -304,7 +467,6 @@ export class ExtractorPanel {
               </div>
             ` : ''}
           </div>
-
           ${remainingParagraphs.length > 0 ? `
             <button class="btn-show-toggle" id="dash-desc-toggle">
               ${this.isDescriptionExpanded ? 'Show less' : '...more'}
@@ -312,10 +474,13 @@ export class ExtractorPanel {
           ` : ''}
         </div>
 
-        <!-- 5. Transcript Section (DIRECTLY UNDER DESCRIPTION) -->
+        <!-- 6. Chapters Section (Optional, if detected) -->
+        ${chaptersSectionHtml}
+
+        <!-- 7. Transcript Section (DIRECTLY UNDER DESCRIPTION / CHAPTERS) -->
         <div class="transcript-section">
           
-          <!-- Section Top Bar: Title & Metadata -->
+          <!-- Section Top Bar: Title, Summary & Collapse Control -->
           <div class="transcript-top-bar">
             <div class="transcript-header-row">
               <div class="transcript-title">
@@ -323,8 +488,16 @@ export class ExtractorPanel {
                 <span>Transcript</span>
                 ${t?.available ? `<span class="status-badge">Auto-extracted</span>` : ''}
               </div>
-              <div class="transcript-meta-info" id="dash-word-count">
-                ${t?.available ? `${filteredSegments.length} segments • ${t.wordCount.toLocaleString()} words` : ''}
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="transcript-meta-info" id="dash-word-count">
+                  ${t?.available ? `${filteredSegments.length} segments • ${t.wordCount.toLocaleString()} words` : ''}
+                </div>
+                <button class="section-collapse-btn" id="dash-transcript-toggle" title="Toggle transcript section visibility">
+                  <span>${this.isTranscriptExpanded ? 'Hide' : 'Show'}</span>
+                  <span class="section-collapse-chevron ${this.isTranscriptExpanded ? '' : 'collapsed'}">
+                    ${SVG_ICONS.chevronDown}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -362,33 +535,38 @@ export class ExtractorPanel {
               </div>
             </div>
 
-            <!-- Controls: Timestamp Toggle & Search Filter -->
-            <div class="transcript-toolbar">
-              <!-- Timestamp Toggle (With vs Without Timestamps) -->
-              <div class="timestamp-toggle-wrap">
-                <label class="switch-toggle">
-                  <input type="checkbox" id="dash-time-toggle" ${this.showTimestamps ? 'checked' : ''}>
-                  <span class="switch-slider"></span>
-                </label>
-                <span id="dash-time-label">Timestamps: <strong>${this.showTimestamps ? 'ON' : 'OFF'}</strong></span>
-              </div>
+            ${this.isTranscriptExpanded ? `
+              <!-- Controls: Timestamp Toggle & Search Filter -->
+              <div class="transcript-toolbar">
+                <div class="timestamp-toggle-wrap">
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="dash-time-toggle" ${this.showTimestamps ? 'checked' : ''}>
+                    <span class="switch-slider"></span>
+                  </label>
+                  <span id="dash-time-label">Timestamps: <strong>${this.showTimestamps ? 'ON' : 'OFF'}</strong></span>
+                </div>
 
-              <!-- Instant Search -->
-              <div class="search-wrap">
-                <span class="search-icon">${SVG_ICONS.search}</span>
-                <input type="text" class="search-input" id="dash-search-input"
-                  placeholder="Search transcript..."
-                  value="${this.escapeHtml(this.searchQuery)}">
+                <div class="search-wrap">
+                  <span class="search-icon">${SVG_ICONS.search}</span>
+                  <input type="text" class="search-input" id="dash-search-input"
+                    placeholder="Search transcript..."
+                    value="${this.escapeHtml(this.searchQuery)}">
+                </div>
               </div>
+            ` : ''}
+          </div>
+
+          ${this.isTranscriptExpanded ? `
+            <!-- Scrollable Transcript Content Container -->
+            <div class="transcript-card" id="dash-transcript-card">
+              ${transcriptBodyHtml}
             </div>
-          </div>
-
-          <!-- Scrollable Transcript Content Container -->
-          <div class="transcript-card" id="dash-transcript-card">
-            ${transcriptBodyHtml}
-          </div>
+          ` : ''}
 
         </div>
+
+        <!-- 8. Comments Section (Collapsible) -->
+        ${commentsSectionHtml}
 
         <!-- Toast Feedback Popup -->
         <div class="toast-popup" id="dash-toast">Copied to clipboard!</div>
@@ -400,6 +578,14 @@ export class ExtractorPanel {
   }
 
   private attachEventListeners(): void {
+    // Thumbnail fallback on error
+    const thumbImg = this.shadowRoot.getElementById('dash-thumb-img');
+    thumbImg?.addEventListener('error', () => {
+      thumbImg.style.display = 'none';
+      const placeholder = this.shadowRoot.getElementById('dash-thumb-placeholder');
+      if (placeholder) placeholder.style.display = 'flex';
+    });
+
     // Auto Extract Toggle
     const autoToggle = this.shadowRoot.getElementById('dash-auto-toggle') as HTMLInputElement | null;
     autoToggle?.addEventListener('change', (e) => {
@@ -420,6 +606,43 @@ export class ExtractorPanel {
       this.render();
     });
 
+    // Chapters Section Collapse / Expand
+    this.shadowRoot.getElementById('dash-chapters-toggle')?.addEventListener('click', () => {
+      this.isChaptersExpanded = !this.isChaptersExpanded;
+      this.render();
+    });
+
+    // Chapters Click to Seek
+    const chapterRows = this.shadowRoot.querySelectorAll('.chapter-row');
+    chapterRows.forEach(row => {
+      row.addEventListener('click', () => {
+        const startSec = parseFloat(row.getAttribute('data-start') || '0');
+        this.seekVideo(startSec);
+      });
+    });
+
+    // Transcript Section Collapse / Expand
+    this.shadowRoot.getElementById('dash-transcript-toggle')?.addEventListener('click', () => {
+      this.isTranscriptExpanded = !this.isTranscriptExpanded;
+      this.render();
+    });
+
+    // Comments Section Collapse / Expand
+    this.shadowRoot.getElementById('dash-comments-toggle')?.addEventListener('click', () => {
+      this.isCommentsExpanded = !this.isCommentsExpanded;
+      this.render();
+    });
+
+    // Comments Sort Dropdown Change
+    const commentSortSelect = this.shadowRoot.getElementById('dash-comment-sort') as HTMLSelectElement | null;
+    commentSortSelect?.addEventListener('change', () => {
+      const newSort = commentSortSelect.value as 'top' | 'newest';
+      this.commentSortOrder = newSort;
+      if (this.callbacks.onCommentSortChange) {
+        this.callbacks.onCommentSortChange(newSort);
+      }
+    });
+
     // Timestamp Toggle Switch (With vs Without Timestamps)
     const timeToggle = this.shadowRoot.getElementById('dash-time-toggle') as HTMLInputElement | null;
     timeToggle?.addEventListener('change', (e) => {
@@ -433,7 +656,6 @@ export class ExtractorPanel {
     searchInput?.addEventListener('input', (e) => {
       this.searchQuery = (e.target as HTMLInputElement).value;
       this.render();
-      // Keep search focused after re-render
       const newSearch = this.shadowRoot.getElementById('dash-search-input') as HTMLInputElement | null;
       if (newSearch) {
         newSearch.focus();
@@ -441,7 +663,7 @@ export class ExtractorPanel {
       }
     });
 
-    // Seeking video on timestamp click
+    // Seeking video on transcript segment click
     const rows = this.shadowRoot.querySelectorAll('.segment-row');
     rows.forEach(row => {
       row.addEventListener('click', () => {
@@ -455,18 +677,18 @@ export class ExtractorPanel {
       this.callbacks.onManualExtract();
     });
 
-    // Single Copy Button (Copies ALL Video Metadata + Description + Transcript)
+    // Single Copy Button (Copies Metadata + Description + Chapters + Transcript + Comments if configured)
     this.shadowRoot.getElementById('dash-copy-btn')?.addEventListener('click', async () => {
       if (!this.result) {
         this.showToast('No data available to copy');
         return;
       }
 
-      const textToCopy = toTXT(this.result, this.showTimestamps);
+      const textToCopy = toTXT(this.result, this.showTimestamps, this.includeCommentsInCopy);
       const success = await copyTextToClipboard(textToCopy);
       if (success) {
         this.showToast(this.showTimestamps 
-          ? '✓ Copied All Metadata & Timestamps!' 
+          ? '✓ Copied All Metadata, Chapters & Timestamps!' 
           : '✓ Copied All Metadata & Clean Text!');
       } else {
         this.showToast('Failed to copy text');
@@ -527,7 +749,7 @@ export class ExtractorPanel {
     this.shadowRoot.getElementById('dash-export-menu')?.classList.remove('show');
 
     if (format === 'md') {
-      const content = toMarkdown(this.result, this.showTimestamps);
+      const content = toMarkdown(this.result, this.showTimestamps, true);
       downloadFile(`${baseName}.md`, content, 'text/markdown;charset=utf-8');
       this.showToast('✓ Downloading Markdown (.md)');
     } else if (format === 'json') {
@@ -535,7 +757,7 @@ export class ExtractorPanel {
       downloadFile(`${baseName}.json`, content, 'application/json;charset=utf-8');
       this.showToast('✓ Downloading JSON (.json)');
     } else if (format === 'txt') {
-      const content = toTXT(this.result, this.showTimestamps);
+      const content = toTXT(this.result, this.showTimestamps, true);
       downloadFile(`${baseName}.txt`, content, 'text/plain;charset=utf-8');
       this.showToast('✓ Downloading Plain Text (.txt)');
     }

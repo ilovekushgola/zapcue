@@ -1,8 +1,11 @@
 // Content Script Entry Point (Isolated World)
 // Coordinates SPA Navigation, Bridge Communication, Extraction Engines, and UI
 
-import { ExtractorResult } from '../types';
+import { ExtractorResult, ZapcueSettings } from '../types';
+import { DEFAULT_SETTINGS, getSettings, saveSettings } from '../utils/settings';
 import { memoryCache } from './extractor/cache';
+import { extractChapters } from './extractor/chapters';
+import { extractComments } from './extractor/comments';
 import { extractMetadata } from './extractor/metadata';
 import { extractTranscript } from './extractor/transcript';
 import { ExtractorPanel } from './ui/panel';
@@ -11,8 +14,9 @@ import { ensureHostPosition } from './ui/shadow-host';
 let currentRequestId = 0;
 let lastVideoId: string | null = null;
 let panel: ExtractorPanel | null = null;
-let userAutoExtract = true;
-let userPreferredLang = 'en';
+let activeSettings: ZapcueSettings = { ...DEFAULT_SETTINGS };
+let lastInnertubeApiKey = '';
+let lastInnertubeContext: any = null;
 
 /**
  * Extracts video ID from current window location.
@@ -42,7 +46,7 @@ async function runExtractionPipeline(videoId: string, requestId: number): Promis
   if (!panel) return;
 
   // 1. Check in-memory cache (<5ms)
-  const cached = memoryCache.get(videoId, userPreferredLang);
+  const cached = memoryCache.get(videoId, activeSettings.preferredLanguage);
   if (cached) {
     if (requestId === currentRequestId) {
       panel.setResult(cached);
@@ -66,7 +70,10 @@ async function runExtractionPipeline(videoId: string, requestId: number): Promis
  * Handles incoming player response dispatched by the Main World bridge.
  */
 async function handleBridgeResponse(detail: any): Promise<void> {
-  const { requestId, videoId, playerResponse } = detail;
+  const { requestId, videoId, playerResponse, innertubeApiKey, innertubeContext } = detail;
+
+  if (innertubeApiKey) lastInnertubeApiKey = innertubeApiKey;
+  if (innertubeContext) lastInnertubeContext = innertubeContext;
 
   // Guard against race conditions: Ignore responses from past requests
   if (requestId !== 0 && requestId !== currentRequestId) {
@@ -81,11 +88,14 @@ async function handleBridgeResponse(detail: any): Promise<void> {
   if (!panel) return;
 
   try {
-    // Fast path: Extract metadata (<20ms)
+    // Fast path 1: Extract metadata (<20ms)
     const metadata = extractMetadata(playerResponse, videoId);
 
-    // Parallel path: Extract transcript (~200ms) with multi-stage fallback
-    const transcript = await extractTranscript(playerResponse, userPreferredLang);
+    // Fast path 2: Extract chapters (<5ms)
+    const chapters = extractChapters(playerResponse, metadata.description, metadata.durationSeconds);
+
+    // Parallel path 3: Extract transcript (~180ms) with multi-stage fallback
+    const transcript = await extractTranscript(playerResponse, activeSettings.preferredLanguage);
 
     if (currentRequestId !== requestId && requestId !== 0) {
       return;
@@ -94,15 +104,45 @@ async function handleBridgeResponse(detail: any): Promise<void> {
     const result: ExtractorResult = {
       videoId,
       metadata,
+      chapters,
       transcript,
       extractedAt: new Date().toISOString()
     };
 
-    // Store in cache for 0ms subsequent visits
-    memoryCache.set(videoId, result, userPreferredLang);
+    // Store base result in cache
+    memoryCache.set(videoId, result, activeSettings.preferredLanguage);
 
-    // Update UI
+    // Render immediately (metadata + chapters + transcript ready in <200ms)
     panel.setResult(result);
+
+    // Non-blocking Asynchronous Path 4: Current-video Comments Extraction
+    if (activeSettings.autoExtractComments) {
+      panel.setComments({
+        available: false,
+        status: 'loading',
+        sortOrder: activeSettings.commentSortOrder,
+        requestedLimit: activeSettings.commentLimit,
+        extractedCount: 0,
+        threads: []
+      });
+
+      extractComments({
+        videoId,
+        limit: activeSettings.commentLimit,
+        sortOrder: activeSettings.commentSortOrder,
+        includeReplies: activeSettings.includeCommentReplies,
+        innertubeApiKey: lastInnertubeApiKey,
+        innertubeContext: lastInnertubeContext
+      }).then((comments) => {
+        if (currentRequestId === requestId || requestId === 0) {
+          result.comments = comments;
+          memoryCache.set(videoId, result, activeSettings.preferredLanguage);
+          panel?.setComments(comments);
+        }
+      }).catch((err) => {
+        console.warn('[YT Extractor] Background comment extraction failed:', err);
+      });
+    }
   } catch (err) {
     console.error('[YT Extractor] Extraction pipeline error:', err);
     panel.setResult(null);
@@ -136,7 +176,7 @@ function handleNavigation(): void {
     panel.render();
   }
 
-  if (userAutoExtract) {
+  if (activeSettings.autoExtract) {
     runExtractionPipeline(videoId, requestId);
   } else {
     panel?.setResult(null);
@@ -155,49 +195,52 @@ function initPanel(): void {
       }
     },
     onAutoExtractToggle: (enabled) => {
-      userAutoExtract = enabled;
-      chrome?.storage?.local?.set({ autoExtract: enabled });
+      activeSettings.autoExtract = enabled;
+      saveSettings({ autoExtract: enabled });
+    },
+    onCommentSortChange: async (newSort) => {
+      activeSettings.commentSortOrder = newSort;
+      saveSettings({ commentSortOrder: newSort });
+      const vid = getCurrentVideoId();
+      if (vid) {
+        panel?.setComments({
+          available: false,
+          status: 'loading',
+          sortOrder: newSort,
+          requestedLimit: activeSettings.commentLimit,
+          extractedCount: 0,
+          threads: []
+        });
+        const comments = await extractComments({
+          videoId: vid,
+          limit: activeSettings.commentLimit,
+          sortOrder: newSort,
+          includeReplies: activeSettings.includeCommentReplies,
+          innertubeApiKey: lastInnertubeApiKey,
+          innertubeContext: lastInnertubeContext
+        });
+        panel?.setComments(comments);
+      }
     }
   });
 
-  panel.setAutoExtract(userAutoExtract);
+  panel.setSettings(activeSettings);
   panel.render();
 }
 
 /**
- * Loads user settings from chrome.storage.local.
+ * Loads user settings from chrome.storage.local with migration.
  */
-function loadSettings(): Promise<void> {
-  return new Promise((resolve) => {
-    if (chrome?.storage?.local) {
-      chrome.storage.local.get(['autoExtract', 'preferredLanguage'], (res) => {
-        if (res.autoExtract !== undefined) {
-          userAutoExtract = Boolean(res.autoExtract);
-        }
-        if (res.preferredLanguage) {
-          userPreferredLang = res.preferredLanguage;
-        }
-        resolve();
-      });
+async function loadSettings(): Promise<void> {
+  activeSettings = await getSettings();
+  panel?.setSettings(activeSettings);
 
-      // Listen for popup settings changes
-      chrome.storage.onChanged.addListener((changes) => {
-        if (changes.autoExtract) {
-          userAutoExtract = changes.autoExtract.newValue;
-          panel?.setAutoExtract(userAutoExtract);
-        }
-        if (changes.preferredLanguage) {
-          userPreferredLang = changes.preferredLanguage.newValue;
-          const vid = getCurrentVideoId();
-          if (vid && userAutoExtract) {
-            runExtractionPipeline(vid, ++currentRequestId);
-          }
-        }
-      });
-    } else {
-      resolve();
-    }
-  });
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(async () => {
+      activeSettings = await getSettings();
+      panel?.setSettings(activeSettings);
+    });
+  }
 }
 
 // Main Initialization Routine

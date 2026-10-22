@@ -503,6 +503,206 @@ it('marks missing subscriber info as unavailable', () => {
 });
 
 // ----------------------------------------------------------------------
+// Test Group 10: Chapter Detection from Description (P1.06)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 10: Chapter Detection & Validation ---');
+
+function parseTimestampToSeconds(ts) {
+  if (!ts) return 0;
+  const parts = ts.trim().split(':').map(p => parseInt(p, 10));
+  if (parts.length === 2) return (parts[0] || 0) * 60 + (parts[1] || 0);
+  if (parts.length === 3) return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+  return 0;
+}
+
+function extractFromDescription(description, totalDuration = 0) {
+  const lines = description.split(/\r?\n/);
+  const rawMatches = [];
+  const timestampRegex = /(?:^|\s)(?:\[|\()?((?:\d{1,2}:)?\d{1,2}:\d{2})(?:\]|\))?\s*[-–—:]?\s*(.+)$/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(timestampRegex);
+    if (match) {
+      const timeText = match[1];
+      const title = match[2].trim().replace(/^[-–—:]+\s*/, '');
+      const startSeconds = parseTimestampToSeconds(timeText);
+      if (title.length > 0 && !isNaN(startSeconds)) {
+        rawMatches.push({ title, startSeconds, timeText });
+      }
+    }
+  }
+
+  if (rawMatches.length < 2) return [];
+
+  const chapters = [];
+  let lastSeconds = -1;
+  for (const m of rawMatches) {
+    if (m.startSeconds >= lastSeconds) {
+      chapters.push({
+        title: m.title,
+        startSeconds: m.startSeconds,
+        startTimestamp: m.timeText,
+        source: 'description_timestamps'
+      });
+      lastSeconds = m.startSeconds;
+    }
+  }
+
+  if (chapters.length < 2) return [];
+
+  for (let i = 0; i < chapters.length; i++) {
+    if (i < chapters.length - 1) {
+      chapters[i].endSeconds = chapters[i + 1].startSeconds;
+    } else if (totalDuration > chapters[i].startSeconds) {
+      chapters[i].endSeconds = totalDuration;
+    }
+  }
+  return chapters;
+}
+
+it('detects and parses chapters from description timestamps with calculated end times', () => {
+  const desc = `
+Check out our latest video!
+Chapters:
+00:00 Introduction
+02:15 Architecture & Design
+08:45 Live Benchmark Results
+12:30 Conclusion
+Follow us on social media!
+  `;
+  const chapters = extractFromDescription(desc, 900);
+  assert.strictEqual(chapters.length, 4);
+  assert.strictEqual(chapters[0].title, 'Introduction');
+  assert.strictEqual(chapters[0].startSeconds, 0);
+  assert.strictEqual(chapters[0].endSeconds, 135);
+  assert.strictEqual(chapters[1].title, 'Architecture & Design');
+  assert.strictEqual(chapters[1].startSeconds, 135);
+  assert.strictEqual(chapters[3].endSeconds, 900);
+});
+
+it('rejects description text with fewer than 2 valid timestamp lines', () => {
+  const desc = 'Check out the video at 02:15 to see the highlights!';
+  const chapters = extractFromDescription(desc, 300);
+  assert.strictEqual(chapters.length, 0);
+});
+
+// ----------------------------------------------------------------------
+// Test Group 11: Comment Normalization & Nested Reply Architecture (P1.09, P1.11)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 11: Comment Normalization & Architecture ---');
+
+function mockParseCommentRenderer(renderer, videoId) {
+  if (!renderer) return null;
+  return {
+    id: renderer.commentId || 'c_1',
+    videoId,
+    text: renderer.text || '',
+    author: {
+      displayName: renderer.author || 'Anonymous',
+      avatarUrl: renderer.avatar || undefined
+    },
+    likeCount: renderer.likes || '0',
+    replyCount: renderer.replies ? renderer.replies.length : 0,
+    replies: renderer.replies || []
+  };
+}
+
+it('constructs nested comment thread with parent and child replies', () => {
+  const rawRenderer = {
+    commentId: 'thread_101',
+    author: 'TechReviewer',
+    text: 'Amazing explanation of the bridge context!',
+    likes: '42',
+    replies: [
+      {
+        id: 'reply_201',
+        videoId: 'v123',
+        text: 'Agreed, this solved my CORS issue completely.',
+        author: { displayName: 'DevViewer' }
+      }
+    ]
+  };
+
+  const parsed = mockParseCommentRenderer(rawRenderer, 'v123');
+  assert.strictEqual(parsed.id, 'thread_101');
+  assert.strictEqual(parsed.author.displayName, 'TechReviewer');
+  assert.strictEqual(parsed.likeCount, '42');
+  assert.strictEqual(parsed.replyCount, 1);
+  assert.strictEqual(parsed.replies.length, 1);
+  assert.strictEqual(parsed.replies[0].author.displayName, 'DevViewer');
+});
+
+// ----------------------------------------------------------------------
+// Test Group 12: Comment and Chapter Aware Exports (P1.07, P1.11)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 12: Comment & Chapter Aware Exports ---');
+
+function mockExportJSON(res) {
+  const ch = res.chapters;
+  const cm = res.comments;
+  return {
+    video: {
+      id: res.metadata.videoId,
+      title: res.metadata.title,
+      thumbnailUrl: res.metadata.thumbnailUrl,
+      channel: {
+        name: res.metadata.channelName,
+        subscriberInfo: res.metadata.subscriberInfo || null
+      }
+    },
+    chapters: {
+      available: ch?.available || false,
+      items: ch?.items || []
+    },
+    comments: cm ? {
+      available: cm.available,
+      status: cm.status,
+      threads: cm.threads || []
+    } : null
+  };
+}
+
+it('JSON export includes thumbnail, subscriber info, chapters, and nested comments', () => {
+  const sampleResult = {
+    videoId: 'testVid',
+    metadata: {
+      videoId: 'testVid',
+      title: 'Zapcue Deep Dive',
+      channelName: 'Zapcue Team',
+      thumbnailUrl: 'https://i.ytimg.com/vi/testVid/maxresdefault.jpg',
+      subscriberInfo: { displayText: '50K subscribers', status: 'rounded' }
+    },
+    chapters: {
+      available: true,
+      items: [
+        { title: 'Intro', startSeconds: 0, startTimestamp: '00:00' },
+        { title: 'Demo', startSeconds: 60, startTimestamp: '01:00' }
+      ]
+    },
+    comments: {
+      available: true,
+      status: 'complete',
+      threads: [
+        {
+          id: 'c1',
+          text: 'Great tool!',
+          author: { displayName: 'Coder' },
+          replies: [{ id: 'r1', text: 'Thanks!', author: { displayName: 'Author' } }]
+        }
+      ]
+    }
+  };
+
+  const exported = mockExportJSON(sampleResult);
+  assert.strictEqual(exported.video.thumbnailUrl, 'https://i.ytimg.com/vi/testVid/maxresdefault.jpg');
+  assert.strictEqual(exported.video.channel.subscriberInfo.displayText, '50K subscribers');
+  assert.strictEqual(exported.chapters.items.length, 2);
+  assert.strictEqual(exported.comments.threads[0].replies.length, 1);
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');

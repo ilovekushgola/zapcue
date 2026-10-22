@@ -26,6 +26,21 @@ export function formatTimestamp(seconds: number): string {
 }
 
 /**
+ * Parses timestamp string (MM:SS or HH:MM:SS) into seconds.
+ */
+export function parseTimestampToSeconds(ts: string): number {
+  if (!ts) return 0;
+  const parts = ts.trim().split(':').map((p) => parseInt(p, 10));
+  if (parts.length === 2) {
+    return (parts[0] || 0) * 60 + (parts[1] || 0);
+  }
+  if (parts.length === 3) {
+    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+  }
+  return 0;
+}
+
+/**
  * Formats a raw number with commas (e.g. 1245000 -> "1,245,000").
  */
 export function formatNumberWithCommas(num: number): string {

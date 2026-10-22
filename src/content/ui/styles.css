@@ -643,3 +643,260 @@ input:checked + .switch-slider:before {
   z-index: 200;
   pointer-events: none;
 }
+
+/* --- ZapCue 2.0 Part 1 Additions --- */
+
+/* 1. Video Thumbnail Preview (Compact 16:9) */
+.thumbnail-preview-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: var(--yt-card-bg);
+  border: 1px solid var(--yt-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumbnail-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbnail-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--yt-text-secondary);
+  font-size: 11px;
+}
+
+.thumbnail-duration-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.channel-subscribers {
+  font-size: 11px;
+  color: var(--yt-text-secondary);
+  margin-top: 1px;
+}
+
+/* 2. Section Collapsible Controls */
+.section-collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--yt-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.section-collapse-btn:hover {
+  color: var(--yt-text-primary);
+  background: var(--yt-btn-secondary-hover);
+}
+
+.section-collapse-chevron {
+  transition: transform 0.2s ease;
+}
+
+.section-collapse-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* 3. Chapters Section */
+.chapters-section {
+  background: var(--yt-card-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chapters-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chapters-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chapters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chapter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.chapter-row:hover {
+  background: var(--yt-card-hover);
+}
+
+.chapter-title {
+  font-size: 12.5px;
+  color: var(--yt-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* 4. Comments Section */
+.comments-section {
+  background: var(--yt-card-bg);
+  border: 1px solid var(--yt-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comments-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.comments-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.comments-sort-select {
+  background: var(--yt-bg);
+  border: 1px solid var(--yt-border);
+  color: var(--yt-text-primary);
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.comment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--yt-bg);
+  border-radius: 6px;
+  border: 1px solid var(--yt-border);
+}
+
+.comment-author-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-author-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #444;
+}
+
+.comment-author-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yt-text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comment-meta {
+  font-size: 10.5px;
+  color: var(--yt-text-secondary);
+}
+
+.comment-body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--yt-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--yt-text-secondary);
+  padding-top: 2px;
+}
+
+.comment-replies-list {
+  margin-top: 6px;
+  margin-left: 12px;
+  padding-left: 8px;
+  border-left: 2px solid var(--yt-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reply-card {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+}
