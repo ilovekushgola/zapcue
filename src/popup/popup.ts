@@ -1,24 +1,36 @@
 // Extension Popup Controller
-document.addEventListener('DOMContentLoaded', () => {
+import { getSettings, saveSettings } from '../utils/settings';
+
+document.addEventListener('DOMContentLoaded', async () => {
   const autoExtractToggle = document.getElementById('auto-extract-toggle') as HTMLInputElement | null;
   const langSelect = document.getElementById('lang-select') as HTMLSelectElement | null;
+  const openOptionsBtn = document.getElementById('open-options-btn');
 
-  if (chrome?.storage?.local) {
-    chrome.storage.local.get(['autoExtract', 'preferredLanguage'], (res) => {
-      if (autoExtractToggle && res.autoExtract !== undefined) {
-        autoExtractToggle.checked = Boolean(res.autoExtract);
-      }
-      if (langSelect && res.preferredLanguage) {
-        langSelect.value = res.preferredLanguage;
-      }
-    });
-
-    autoExtractToggle?.addEventListener('change', () => {
-      chrome.storage.local.set({ autoExtract: autoExtractToggle.checked });
-    });
-
-    langSelect?.addEventListener('change', () => {
-      chrome.storage.local.set({ preferredLanguage: langSelect.value });
-    });
+  // Load current settings via unified source of truth
+  const settings = await getSettings();
+  if (autoExtractToggle) {
+    autoExtractToggle.checked = settings.autoExtract;
   }
+  if (langSelect) {
+    langSelect.value = settings.preferredLanguage;
+  }
+
+  // Auto extract quick toggle
+  autoExtractToggle?.addEventListener('change', async () => {
+    await saveSettings({ autoExtract: autoExtractToggle.checked });
+  });
+
+  // Preferred language quick toggle
+  langSelect?.addEventListener('change', async () => {
+    await saveSettings({ preferredLanguage: langSelect.value });
+  });
+
+  // Open Full Settings Page
+  openOptionsBtn?.addEventListener('click', () => {
+    if (chrome?.runtime?.openOptionsPage) {
+      chrome.runtime.openOptionsPage();
+    } else {
+      window.open(chrome.runtime.getURL('options/options.html'));
+    }
+  });
 });

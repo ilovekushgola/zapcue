@@ -37,6 +37,8 @@ it('manifest.json exists and adheres to MV3 structure', () => {
   assert.ok(manifest.name, 'Manifest must have a name');
   assert.ok(manifest.version, 'Manifest must have a version');
   assert.ok(manifest.content_scripts.length >= 2, 'Must have at least 2 content scripts');
+  assert.ok(manifest.options_ui, 'Manifest must have options_ui declared');
+  assert.strictEqual(manifest.options_ui.page, 'options/options.html');
 
   const mainWorldScript = manifest.content_scripts.find(s => s.world === 'MAIN');
   assert.ok(mainWorldScript, 'Must have a MAIN world content script for bridge');
@@ -61,6 +63,7 @@ it('all compiled bundles exist and are non-empty', () => {
   assert.ok(fs.existsSync('dist/content/index.js'));
   assert.ok(fs.existsSync('dist/background/service-worker.js'));
   assert.ok(fs.existsSync('dist/popup/popup.html'));
+  assert.ok(fs.existsSync('dist/options/options.html'));
 });
 
 // ----------------------------------------------------------------------

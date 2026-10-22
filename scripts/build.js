@@ -63,7 +63,7 @@ async function run() {
   });
 
   // 4. Build Popup (HTML App)
-  console.log('[4/4] Building Popup...');
+  console.log('[4/5] Building Popup...');
   await build({
     configFile: false,
     publicDir: false,
@@ -78,8 +78,24 @@ async function run() {
     }
   });
 
-  // 5. Copy manifest.json & icons to dist
-  console.log('[5/5] Copying Manifest and Assets...');
+  // 5. Build Options Page (HTML App)
+  console.log('[5/5] Building Options Page...');
+  await build({
+    configFile: false,
+    publicDir: false,
+    root: path.resolve(root, 'src/options'),
+    base: './',
+    build: {
+      outDir: path.resolve(root, 'dist/options'),
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.resolve(root, 'src/options/options.html'),
+      }
+    }
+  });
+
+  // 6. Copy manifest.json & icons to dist
+  console.log('[6/6] Copying Manifest and Assets...');
   fs.copyFileSync(path.join(root, 'public/manifest.json'), path.join(root, 'dist/manifest.json'));
   fs.cpSync(path.join(root, 'public/icons'), path.join(root, 'dist/icons'), { recursive: true });
 

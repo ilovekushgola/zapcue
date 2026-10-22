@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zapcue Settings & Preferences</title>
+  <link rel="stylesheet" href="./options.css">
+</head>
+<body>
+  <div class="settings-app">
+    <!-- Navigation / Header -->
+    <header class="settings-header">
+      <div class="header-content">
+        <div class="brand">
+          <img src="../icons/icon48.png" width="36" height="36" alt="Zapcue Logo" class="brand-logo">
+          <div>
+            <h1 class="brand-title">Zapcue Settings</h1>
+            <p class="brand-subtitle">High-performance YouTube metadata, transcript, chapters & comment extractor</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="save-pill" id="save-pill">✓ Saved</span>
+          <span class="version-tag">v2.0 (Part 1)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Settings Container -->
+    <main class="settings-main">
+      <div class="settings-grid">
+
+        <!-- 1. General Preferences -->
+        <section class="card">
+          <div class="card-header">
+            <h2>⚙️ General</h2>
+            <p>Core extension behavior and display preferences</p>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-auto-extract" class="setting-label">Auto-Extract on Video Open</label>
+                <span class="setting-desc">Automatically fetch metadata, chapters, and transcript when navigating to any video</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-auto-extract">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-pref-lang" class="setting-label">Preferred Transcript Language</label>
+                <span class="setting-desc">Primary caption language code priority (e.g. en, hi, es, fr, de, ja)</span>
+              </div>
+              <select id="opt-pref-lang" class="select-control">
+                <option value="en">English (en)</option>
+                <option value="hi">Hindi (hi)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="fr">French (fr)</option>
+                <option value="de">German (de)</option>
+                <option value="ja">Japanese (ja)</option>
+                <option value="zh">Chinese (zh)</option>
+                <option value="ar">Arabic (ar)</option>
+                <option value="ru">Russian (ru)</option>
+                <option value="pt">Portuguese (pt)</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-theme" class="setting-label">Theme Mode</label>
+                <span class="setting-desc">Match YouTube's system theme or force Dark / Light appearance</span>
+              </div>
+              <select id="opt-theme" class="select-control">
+                <option value="auto">Auto (Match YouTube Theme)</option>
+                <option value="dark">Dark Theme</option>
+                <option value="light">Light Theme</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Panel Layout & Drawer Sections -->
+        <section class="card">
+          <div class="card-header">
+            <h2>📐 Drawer Layout & Sections</h2>
+            <p>Customize which sections appear and their default expanded state</p>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-thumb-preview" class="setting-label">Video Thumbnail Preview</label>
+                <span class="setting-desc">Render a compact 16:9 thumbnail preview at the top of the sidebar drawer</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-thumb-preview">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-def-transcript-exp" class="setting-label">Default Transcript Expanded</label>
+                <span class="setting-desc">Keep the transcript segment list expanded by default upon extraction</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-def-transcript-exp">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-def-chapters-exp" class="setting-label">Default Chapters Expanded</label>
+                <span class="setting-desc">Show detected video chapters expanded by default</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-def-chapters-exp">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-def-comments-exp" class="setting-label">Default Comments Expanded</label>
+                <span class="setting-desc">Keep comments section expanded by default (default is collapsed for clean layout)</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-def-comments-exp">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Current-Video Comments Extractor -->
+        <section class="card">
+          <div class="card-header">
+            <h2>💬 Comments Engine</h2>
+            <p>Asynchronous, zero-external-API client-side comments extraction</p>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-auto-comments" class="setting-label">Extract Comments Automatically</label>
+                <span class="setting-desc">Collect comments in background without blocking video metadata or transcripts</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-auto-comments">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-comment-sort" class="setting-label">Default Sort Order</label>
+                <span class="setting-desc">Retrieve top popular comments or newest comments first</span>
+              </div>
+              <select id="opt-comment-sort" class="select-control">
+                <option value="top">Top Comments (Popular)</option>
+                <option value="newest">Newest First</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-comment-limit" class="setting-label">Per-Video Comment Limit</label>
+                <span class="setting-desc">Maximum number of top-level comments to extract per video</span>
+              </div>
+              <select id="opt-comment-limit" class="select-control">
+                <option value="20">20 comments (Fastest)</option>
+                <option value="50">50 comments (Recommended)</option>
+                <option value="100">100 comments</option>
+                <option value="200">200 comments</option>
+                <option value="0">0 (Disabled)</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-comment-replies" class="setting-label">Include Comment Replies</label>
+                <span class="setting-desc">Extract nested child replies under each parent comment (increases payload)</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-comment-replies">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-comments-in-copy" class="setting-label">Include Comments in 1-Click Copy</label>
+                <span class="setting-desc">Include extracted comments inside the single Copy clipboard payload (default OFF)</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-comments-in-copy">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Export Preferences -->
+        <section class="card">
+          <div class="card-header">
+            <h2>💾 Export Configuration</h2>
+            <p>Control what fields are bundled in Markdown, JSON, and Plain Text downloads</p>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-export-chapters" class="setting-label">Include Chapters</label>
+                <span class="setting-desc">Add chapter timestamps and titles to Markdown, JSON, and TXT exports</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-export-chapters">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-export-images" class="setting-label">Include Thumbnail & Avatar URLs</label>
+                <span class="setting-desc">Include high-resolution video thumbnail and channel avatar URLs</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-export-images">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <label for="opt-export-comments" class="setting-label">Include Comments in Exports</label>
+                <span class="setting-desc">Include extracted comment threads and nested replies in exported files</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-export-comments">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Privacy, Performance & Reset -->
+        <section class="card danger-card">
+          <div class="card-header">
+            <h2>🛡️ Privacy, Performance & Storage</h2>
+            <p>Client-side zero-tracker architecture and preference management</p>
+          </div>
+          <div class="card-body">
+            <div class="info-callout">
+              <strong>100% Client-Side Privacy:</strong> Zapcue never routes your video data, searches, transcripts, or comments through any third-party server or external API. All extraction happens directly in your browser.
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <span class="setting-label">Reset All Settings</span>
+                <span class="setting-desc">Restore Zapcue preferences and extraction defaults to factory baseline</span>
+              </div>
+              <button class="btn-danger" id="btn-reset-settings">Reset to Defaults</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="settings-footer">
+      <span>Zapcue v2.0 • Open Source MIT License • Built for Speed & Precision</span>
+    </footer>
+  </div>
+
+  <script type="module" src="./options.ts"></script>
+</body>
+</html>
