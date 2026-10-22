@@ -394,6 +394,78 @@ it('unknown or invalid dates render N/A Date and never 2026', () => {
 });
 
 // ----------------------------------------------------------------------
+// Test Group 8: Settings Normalization & Migration (P1.03)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 8: Settings Normalization & Migration ---');
+
+const DEFAULT_SETTINGS = {
+  schemaVersion: 2,
+  autoExtract: true,
+  preferredLanguage: 'en',
+  theme: 'auto',
+  showThumbnailPreview: true,
+  defaultTranscriptExpanded: true,
+  defaultChaptersExpanded: true,
+  defaultCommentsExpanded: false,
+  autoExtractComments: true,
+  commentSortOrder: 'top',
+  commentLimit: 50,
+  includeCommentReplies: false,
+  includeCommentsInCopy: false,
+  exportIncludeChapters: true,
+  exportIncludeImages: true,
+  exportIncludeComments: true
+};
+
+function normalizeSettings(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { ...DEFAULT_SETTINGS };
+  }
+  return {
+    schemaVersion: 2,
+    autoExtract: raw.autoExtract !== undefined ? Boolean(raw.autoExtract) : DEFAULT_SETTINGS.autoExtract,
+    preferredLanguage: typeof raw.preferredLanguage === 'string' && raw.preferredLanguage ? raw.preferredLanguage : DEFAULT_SETTINGS.preferredLanguage,
+    theme: raw.theme === 'dark' || raw.theme === 'light' || raw.theme === 'auto' ? raw.theme : DEFAULT_SETTINGS.theme,
+    showThumbnailPreview: raw.showThumbnailPreview !== undefined ? Boolean(raw.showThumbnailPreview) : DEFAULT_SETTINGS.showThumbnailPreview,
+    defaultTranscriptExpanded: raw.defaultTranscriptExpanded !== undefined ? Boolean(raw.defaultTranscriptExpanded) : DEFAULT_SETTINGS.defaultTranscriptExpanded,
+    defaultChaptersExpanded: raw.defaultChaptersExpanded !== undefined ? Boolean(raw.defaultChaptersExpanded) : DEFAULT_SETTINGS.defaultChaptersExpanded,
+    defaultCommentsExpanded: raw.defaultCommentsExpanded !== undefined ? Boolean(raw.defaultCommentsExpanded) : DEFAULT_SETTINGS.defaultCommentsExpanded,
+    autoExtractComments: raw.autoExtractComments !== undefined ? Boolean(raw.autoExtractComments) : DEFAULT_SETTINGS.autoExtractComments,
+    commentSortOrder: raw.commentSortOrder === 'newest' ? 'newest' : 'top',
+    commentLimit: typeof raw.commentLimit === 'number' && !isNaN(raw.commentLimit) ? Math.min(Math.max(0, raw.commentLimit), 500) : DEFAULT_SETTINGS.commentLimit,
+    includeCommentReplies: raw.includeCommentReplies !== undefined ? Boolean(raw.includeCommentReplies) : DEFAULT_SETTINGS.includeCommentReplies,
+    includeCommentsInCopy: raw.includeCommentsInCopy !== undefined ? Boolean(raw.includeCommentsInCopy) : DEFAULT_SETTINGS.includeCommentsInCopy,
+    exportIncludeChapters: raw.exportIncludeChapters !== undefined ? Boolean(raw.exportIncludeChapters) : DEFAULT_SETTINGS.exportIncludeChapters,
+    exportIncludeImages: raw.exportIncludeImages !== undefined ? Boolean(raw.exportIncludeImages) : DEFAULT_SETTINGS.exportIncludeImages,
+    exportIncludeComments: raw.exportIncludeComments !== undefined ? Boolean(raw.exportIncludeComments) : DEFAULT_SETTINGS.exportIncludeComments
+  };
+}
+
+it('normalizes empty input to default settings with schemaVersion 2', () => {
+  const settings = normalizeSettings(null);
+  assert.strictEqual(settings.schemaVersion, 2);
+  assert.strictEqual(settings.autoExtract, true);
+  assert.strictEqual(settings.commentLimit, 50);
+  assert.strictEqual(settings.defaultCommentsExpanded, false);
+});
+
+it('migrates v1 user preferences without loss and applies v2 defaults', () => {
+  const v1Input = { autoExtract: false, preferredLanguage: 'hi' };
+  const settings = normalizeSettings(v1Input);
+  assert.strictEqual(settings.schemaVersion, 2);
+  assert.strictEqual(settings.autoExtract, false, 'v1 autoExtract must be preserved');
+  assert.strictEqual(settings.preferredLanguage, 'hi', 'v1 preferredLanguage must be preserved');
+  assert.strictEqual(settings.showThumbnailPreview, true, 'v2 defaults must be populated');
+  assert.strictEqual(settings.exportIncludeChapters, true);
+});
+
+it('clamps out-of-range comment limit values safely', () => {
+  assert.strictEqual(normalizeSettings({ commentLimit: 9999 }).commentLimit, 500);
+  assert.strictEqual(normalizeSettings({ commentLimit: -10 }).commentLimit, 0);
+  assert.strictEqual(normalizeSettings({ commentLimit: 100 }).commentLimit, 100);
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');

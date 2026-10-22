@@ -1,3 +1,9 @@
+export interface SubscriberInfo {
+  count?: number;
+  displayText: string;
+  status: 'available' | 'rounded' | 'hidden' | 'unavailable';
+}
+
 export interface VideoMetadata {
   videoId: string;
   url: string;
@@ -13,7 +19,50 @@ export interface VideoMetadata {
   description: string;
   thumbnailUrl: string;
   channelAvatarUrl?: string;
+  subscriberInfo?: SubscriberInfo;
   isShort: boolean;
+}
+
+export interface ChapterItem {
+  title: string;
+  startSeconds: number;
+  startTimestamp: string;
+  endSeconds?: number;
+  source: 'player_markers' | 'description_timestamps';
+}
+
+export interface ChapterData {
+  available: boolean;
+  items: ChapterItem[];
+}
+
+export interface CommentAuthor {
+  displayName: string;
+  channelUrl?: string;
+  avatarUrl?: string;
+}
+
+export interface CommentItem {
+  id: string;
+  videoId: string;
+  text: string;
+  author: CommentAuthor;
+  publishedAt?: string;
+  likeCount?: string;
+  replyCount?: number;
+  isOwner?: boolean;
+  isPinned?: boolean;
+  replies?: CommentItem[];
+}
+
+export interface CommentData {
+  available: boolean;
+  status: 'complete' | 'partial' | 'loading' | 'unavailable' | 'failed' | 'not_requested';
+  sortOrder: 'top' | 'newest';
+  requestedLimit: number;
+  extractedCount: number;
+  threads: CommentItem[];
+  error?: string;
 }
 
 export interface TranscriptSegment {
@@ -44,7 +93,32 @@ export interface ExtractorResult {
   videoId: string;
   metadata: VideoMetadata;
   transcript: TranscriptData;
+  chapters?: ChapterData;
+  comments?: CommentData;
   extractedAt: string;
+}
+
+export interface ZapcueSettings {
+  schemaVersion: number;
+  // General
+  autoExtract: boolean;
+  preferredLanguage: string;
+  theme: 'auto' | 'dark' | 'light';
+  // Panel layout
+  showThumbnailPreview: boolean;
+  defaultTranscriptExpanded: boolean;
+  defaultChaptersExpanded: boolean;
+  defaultCommentsExpanded: boolean;
+  // Comments
+  autoExtractComments: boolean;
+  commentSortOrder: 'top' | 'newest';
+  commentLimit: number;
+  includeCommentReplies: boolean;
+  includeCommentsInCopy: boolean;
+  // Export
+  exportIncludeChapters: boolean;
+  exportIncludeImages: boolean;
+  exportIncludeComments: boolean;
 }
 
 export interface UserPreferences {
