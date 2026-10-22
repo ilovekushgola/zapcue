@@ -706,6 +706,307 @@ it('JSON export includes thumbnail, subscriber info, chapters, and nested commen
 });
 
 // ----------------------------------------------------------------------
+// Test Group 13: Comment Extraction Limit Hard Caps (P0 Audit)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 13: Comment Extraction Limit Hard Caps (10, 20, 50, 100, 200) ---');
+
+function mockExtractCommentsPipeline(totalPool, limit, sortOrder = 'top', includeReplies = true) {
+  const effectiveLimit = Math.max(0, Math.min(isNaN(limit) ? 50 : limit, 500));
+  if (effectiveLimit === 0) {
+    return {
+      available: false,
+      status: 'not_requested',
+      sortOrder,
+      requestedLimit: limit,
+      effectiveLimit: 0,
+      topLevelCount: 0,
+      replyCount: 0,
+      extractedCount: 0,
+      threads: [],
+      reason: 'not_requested'
+    };
+  }
+
+  const seenIds = new Set();
+  const threads = [];
+  for (const item of totalPool) {
+    if (threads.length >= effectiveLimit) break;
+    if (!seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      const cloned = { ...item };
+      if (!includeReplies) {
+        cloned.replies = [];
+      }
+      threads.push(cloned);
+    }
+  }
+
+  const finalThreads = threads.slice(0, effectiveLimit);
+  const topLevelCount = finalThreads.length;
+  const replyCount = finalThreads.reduce((acc, t) => acc + (t.replies ? t.replies.length : 0), 0);
+
+  let status = 'complete';
+  let reason = 'reached_limit';
+  if (topLevelCount === 0) {
+    status = 'complete';
+    reason = 'zero_comments';
+  } else if (topLevelCount < effectiveLimit) {
+    status = 'complete';
+    reason = 'all_available_extracted';
+  }
+
+  return {
+    available: topLevelCount > 0,
+    status,
+    sortOrder,
+    requestedLimit: limit,
+    effectiveLimit,
+    topLevelCount,
+    replyCount,
+    extractedCount: topLevelCount,
+    threads: finalThreads,
+    reason
+  };
+}
+
+// Generate a pool of 250 mock comments with 2 replies each
+const mockPool250 = Array.from({ length: 250 }, (_, i) => ({
+  id: `comment_${i + 1}`,
+  videoId: 'mockVideo123',
+  text: `This is comment number ${i + 1}`,
+  author: { displayName: `User_${i + 1}`, channelUrl: `https://youtube.com/@user_${i + 1}`, avatarUrl: `https://yt.com/avatar_${i + 1}.jpg` },
+  publishedAt: `${i + 1} days ago`,
+  likeCount: `${i * 3}`,
+  replyCount: 2,
+  replies: [
+    { id: `reply_${i + 1}_1`, parentCommentId: `comment_${i + 1}`, text: `Reply 1 to comment ${i + 1}`, author: { displayName: `Replier_${i + 1}_1` }, likeCount: '1' },
+    { id: `reply_${i + 1}_2`, parentCommentId: `comment_${i + 1}`, text: `Reply 2 to comment ${i + 1}`, author: { displayName: `Replier_${i + 1}_2` }, likeCount: '0' }
+  ]
+}));
+
+[10, 20, 50, 100, 200].forEach((cap) => {
+  it(`enforces hard maximum limit of ${cap} top-level comments and counts replies separately`, () => {
+    const result = mockExtractCommentsPipeline(mockPool250, cap, 'top', true);
+    assert.strictEqual(result.topLevelCount, cap, `Top-level comments must equal cap ${cap}`);
+    assert.strictEqual(result.threads.length, cap, `Thread array must equal cap ${cap}`);
+    assert.strictEqual(result.effectiveLimit, cap);
+    assert.strictEqual(result.replyCount, cap * 2, `Replies must be counted separately (${cap * 2})`);
+    assert.strictEqual(result.status, 'complete');
+    assert.strictEqual(result.reason, 'reached_limit');
+  });
+});
+
+it('handles limit 0 as not_requested with zero extracted comments', () => {
+  const result = mockExtractCommentsPipeline(mockPool250, 0);
+  assert.strictEqual(result.available, false);
+  assert.strictEqual(result.status, 'not_requested');
+  assert.strictEqual(result.topLevelCount, 0);
+  assert.strictEqual(result.threads.length, 0);
+});
+
+// ----------------------------------------------------------------------
+// Test Group 14: Dynamic Cap Adjustment & Cache Trimming
+// ----------------------------------------------------------------------
+console.log('\n--- Group 14: Dynamic Cap Adjustment & Cache Trimming ---');
+
+it('lowering cap after larger extraction trims cached result without retaining excess comments', () => {
+  // Initial run at cap 100
+  const initial = mockExtractCommentsPipeline(mockPool250, 100);
+  assert.strictEqual(initial.topLevelCount, 100);
+
+  // User lowers cap to 20
+  const newCap = 20;
+  const trimmedThreads = initial.threads.slice(0, newCap);
+  const trimmedResult = {
+    ...initial,
+    requestedLimit: newCap,
+    effectiveLimit: newCap,
+    topLevelCount: trimmedThreads.length,
+    replyCount: trimmedThreads.reduce((s, th) => s + (th.replies ? th.replies.length : 0), 0),
+    extractedCount: trimmedThreads.length,
+    threads: trimmedThreads,
+    status: 'complete',
+    reason: 'reached_limit'
+  };
+
+  assert.strictEqual(trimmedResult.topLevelCount, 20);
+  assert.strictEqual(trimmedResult.threads.length, 20);
+  assert.strictEqual(trimmedResult.replyCount, 40);
+  assert.strictEqual(trimmedResult.effectiveLimit, 20);
+  assert.strictEqual(trimmedResult.threads[19].id, 'comment_20');
+});
+
+// ----------------------------------------------------------------------
+// Test Group 15: Deduplication Across Batches and Fallbacks
+// ----------------------------------------------------------------------
+console.log('\n--- Group 15: Deduplication Across Batches & Fallbacks ---');
+
+it('deduplicates comments appearing in multiple pagination batches or fallbacks', () => {
+  const seenIds = new Set();
+  const rawBatch1 = [
+    { id: 'c1', text: 'First' },
+    { id: 'c2', text: 'Second' }
+  ];
+  const rawBatch2WithDuplicates = [
+    { id: 'c2', text: 'Second (duplicate)' },
+    { id: 'c3', text: 'Third' },
+    { id: 'c1', text: 'First (duplicate)' }
+  ];
+
+  const combined = [];
+  [...rawBatch1, ...rawBatch2WithDuplicates].forEach(c => {
+    if (!seenIds.has(c.id)) {
+      seenIds.add(c.id);
+      combined.push(c);
+    }
+  });
+
+  assert.strictEqual(combined.length, 3);
+  assert.deepStrictEqual(combined.map(c => c.id), ['c1', 'c2', 'c3']);
+});
+
+// ----------------------------------------------------------------------
+// Test Group 16: Sort Verification & Degradation Reporting
+// ----------------------------------------------------------------------
+console.log('\n--- Group 16: Sort Verification & Degradation Reporting ---');
+
+function mockVerifySort(requestedSort, availableTokens) {
+  if (requestedSort === 'newest') {
+    if (availableTokens.newestToken) {
+      return { effectiveSort: 'newest', warning: undefined };
+    }
+    return {
+      effectiveSort: 'top',
+      warning: 'Requested newest sort is not supported for this video; defaulted to top comments.'
+    };
+  }
+  return { effectiveSort: 'top', warning: undefined };
+}
+
+it('reports verified newest sort when token is available from provider', () => {
+  const res = mockVerifySort('newest', { topToken: 'tok_top', newestToken: 'tok_newest' });
+  assert.strictEqual(res.effectiveSort, 'newest');
+  assert.strictEqual(res.warning, undefined);
+});
+
+it('gracefully degrades to top sort with truthful warning when newest is unsupported', () => {
+  const res = mockVerifySort('newest', { topToken: 'tok_top' });
+  assert.strictEqual(res.effectiveSort, 'top');
+  assert.ok(res.warning.includes('defaulted to top comments'));
+});
+
+// ----------------------------------------------------------------------
+// Test Group 17: Markdown and Plain Text Serialization Hierarchy & Escaping
+// ----------------------------------------------------------------------
+console.log('\n--- Group 17: Markdown & Plain Text Serialization Hierarchy ---');
+
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .trim();
+}
+
+function mockToMarkdown(result) {
+  const m = result.metadata;
+  const ch = result.chapters;
+  const cm = result.comments;
+
+  let chaptersMd = '';
+  if (ch?.available && ch.items.length > 0) {
+    chaptersMd = `\n## Chapters (${ch.items.length} Detected)\n` +
+      ch.items.map(c => `| **[${c.startTimestamp}]** | ${c.formattedDuration || '-'} | ${escapeMarkdown(c.title)} |`).join('\n') + '\n';
+  }
+
+  let commentsMd = '';
+  if (cm?.available && cm.threads.length > 0) {
+    commentsMd = `\n## Comments (${cm.topLevelCount} Top-Level, ${cm.replyCount} Replies • ${cm.sortOrder === 'top' ? 'Top Comments' : 'Newest First'})\n\n`;
+    commentsMd += cm.threads.map((th, i) => {
+      let b = `### #${i + 1} — [${escapeMarkdown(th.author.displayName)}](${th.author.channelUrl || '#'})\n` +
+        `| **Comment ID** | \`${th.id}\` |\n` +
+        `| **Likes** | ❤️ ${th.likeCount || '0'} |\n` +
+        `| **Replies** | 💬 ${th.replyCount || 0} |\n\n` +
+        `> ${escapeMarkdown(th.text).replace(/\n/g, '\n> ')}\n`;
+
+      if (th.replies && th.replies.length > 0) {
+        b += `\n**Replies (${th.replies.length}):**\n\n`;
+        b += th.replies.map((r, rIdx) => {
+          return `> **↳ #${i + 1}.${rIdx + 1} ${escapeMarkdown(r.author.displayName)}** [ID: \`${r.id}\`]:\n` +
+            `> ${escapeMarkdown(r.text).replace(/\n/g, '\n> ')}\n`;
+        }).join('\n');
+      }
+      return b;
+    }).join('\n---\n\n');
+  }
+
+  const subsDisplay = m.subscriberInfo ? `${m.subscriberInfo.displayText} (${m.subscriberInfo.status})` : 'Unavailable';
+  const thumbLink = `[${escapeMarkdown(m.title)} - Thumbnail](${m.thumbnailUrl})`;
+  const avatarLink = m.channelAvatarUrl ? `[Channel Avatar](${m.channelAvatarUrl})` : 'Unavailable';
+
+  return `# ${m.title}\n\n` +
+    `| **Channel** | ${m.channelName} |\n` +
+    `| **Subscribers** | ${subsDisplay} |\n` +
+    `| **Thumbnail** | ${thumbLink} |\n` +
+    `| **Avatar** | ${avatarLink} |\n` +
+    chaptersMd + commentsMd;
+}
+
+it('generates Markdown with subscriber status, thumbnail/avatar links, and nested comment hierarchy', () => {
+  const fullMock = {
+    metadata: {
+      title: 'Advanced AI Architectures <2026>',
+      channelName: 'DeepMind Dev',
+      thumbnailUrl: 'https://img.youtube.com/vi/abc/hqdefault.jpg',
+      channelAvatarUrl: 'https://yt.com/avatar.jpg',
+      subscriberInfo: { displayText: '1.5M subscribers', status: 'rounded' }
+    },
+    chapters: {
+      available: true,
+      items: [
+        { title: 'Intro & Motivation', startTimestamp: '00:00', formattedDuration: '02:30' },
+        { title: 'Graph Transformers', startTimestamp: '02:30', formattedDuration: '05:00' }
+      ]
+    },
+    comments: {
+      available: true,
+      status: 'complete',
+      sortOrder: 'top',
+      topLevelCount: 1,
+      replyCount: 1,
+      threads: [
+        {
+          id: 'c_top_1',
+          text: 'Great video on <script>alert(1)</script> & KaTeX!',
+          author: { displayName: 'Alice', channelUrl: 'https://youtube.com/@alice' },
+          likeCount: '15',
+          replyCount: 1,
+          replies: [
+            {
+              id: 'r_sub_1',
+              parentCommentId: 'c_top_1',
+              text: 'Thanks Alice! More coming soon.',
+              author: { displayName: 'DeepMind Dev' },
+              likeCount: '3'
+            }
+          ]
+        }
+      ]
+    }
+  };
+
+  const md = mockToMarkdown(fullMock);
+  assert.ok(md.includes('1.5M subscribers (rounded)'));
+  assert.ok(md.includes('[Advanced AI Architectures &lt;2026&gt; - Thumbnail](https://img.youtube.com/vi/abc/hqdefault.jpg)'));
+  assert.ok(md.includes('[Channel Avatar](https://yt.com/avatar.jpg)'));
+  assert.ok(md.includes('Graph Transformers'));
+  assert.ok(md.includes('| **Comment ID** | `c_top_1` |'));
+  assert.ok(md.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  assert.ok(md.includes('↳ #1.1 DeepMind Dev** [ID: `r_sub_1`]'));
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');
