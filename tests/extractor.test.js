@@ -466,6 +466,43 @@ it('clamps out-of-range comment limit values safely', () => {
 });
 
 // ----------------------------------------------------------------------
+// Test Group 9: Subscriber Count Normalization (P1.04)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 9: Subscriber Count Normalization ---');
+
+function normalizeSubscriberText(rawText) {
+  if (!rawText || !rawText.trim()) {
+    return { displayText: 'Unavailable', status: 'unavailable' };
+  }
+  const cleanText = rawText.trim().replace(/\s+/g, ' ');
+  const isHidden = /hidden/i.test(cleanText);
+  const isRounded = /^[0-9]+(\.[0-9]+)?[KkMmBb]/.test(cleanText);
+  return {
+    displayText: cleanText,
+    status: isHidden ? 'hidden' : (isRounded ? 'rounded' : 'available')
+  };
+}
+
+it('detects rounded subscriber count without converting to fake exact number', () => {
+  const res = normalizeSubscriberText('1.25M subscribers');
+  assert.strictEqual(res.displayText, '1.25M subscribers');
+  assert.strictEqual(res.status, 'rounded');
+  assert.strictEqual(res.count, undefined, 'Must not invent exact integer from rounded string');
+});
+
+it('detects hidden subscriber state correctly', () => {
+  const res = normalizeSubscriberText('Subscribers hidden');
+  assert.strictEqual(res.status, 'hidden');
+  assert.strictEqual(res.displayText, 'Subscribers hidden');
+});
+
+it('marks missing subscriber info as unavailable', () => {
+  const res = normalizeSubscriberText('');
+  assert.strictEqual(res.status, 'unavailable');
+  assert.strictEqual(res.displayText, 'Unavailable');
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');

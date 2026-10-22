@@ -1,4 +1,4 @@
-import { VideoMetadata } from '../../types';
+import { SubscriberInfo, VideoMetadata } from '../../types';
 import { formatCompactNumber, formatDuration, formatNumberWithCommas } from '../utils/time';
 
 /**
@@ -34,6 +34,60 @@ export function extractLikeCountFromDOM(): string {
     console.warn('[YT Extractor] Error reading like count from DOM:', e);
   }
   return 'N/A';
+}
+
+/**
+ * Extracts channel subscriber count from YouTube DOM or player response.
+ */
+export function extractSubscriberInfo(playerResponse?: any): SubscriberInfo {
+  try {
+    // 1. Check DOM selectors
+    const subSelectors = [
+      '#owner-sub-count',
+      'ytd-video-owner-renderer #owner-sub-count',
+      '#subscriber-count',
+      'ytd-subscribe-button-renderer #subscriber-count'
+    ];
+
+    for (const selector of subSelectors) {
+      const el = document.querySelector(selector);
+      const text = el?.textContent?.trim();
+      if (text) {
+        const cleanText = text.replace(/\s+/g, ' ');
+        const isHidden = /hidden/i.test(cleanText);
+        const isRounded = /^[0-9]+(\.[0-9]+)?[KkMmBb]/.test(cleanText);
+        return {
+          displayText: cleanText,
+          status: isHidden ? 'hidden' : (isRounded ? 'rounded' : 'available')
+        };
+      }
+    }
+
+    // 2. Check player response secondary info if available
+    const ownerRenderer = playerResponse?.contents?.twoColumnWatchNextResults?.results?.results?.contents?.find(
+      (c: any) => c?.videoSecondaryInfoRenderer
+    )?.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer;
+
+    const subText = ownerRenderer?.subscriberCountText?.simpleText ||
+                    ownerRenderer?.subscriberCountText?.runs?.map((r: any) => r.text).join('');
+
+    if (subText && subText.trim()) {
+      const cleanText = subText.trim().replace(/\s+/g, ' ');
+      const isHidden = /hidden/i.test(cleanText);
+      const isRounded = /^[0-9]+(\.[0-9]+)?[KkMmBb]/.test(cleanText);
+      return {
+        displayText: cleanText,
+        status: isHidden ? 'hidden' : (isRounded ? 'rounded' : 'available')
+      };
+    }
+  } catch (e) {
+    console.warn('[YT Extractor] Error reading subscriber info:', e);
+  }
+
+  return {
+    displayText: 'Unavailable',
+    status: 'unavailable'
+  };
 }
 
 /**
@@ -113,6 +167,9 @@ export function extractMetadata(playerResponse: any, videoId: string): VideoMeta
     // Ignore DOM read error
   }
 
+  // 10. Channel Subscriber Info
+  const subscriberInfo = extractSubscriberInfo(playerResponse);
+
   return {
     videoId,
     url: canonicalUrl,
@@ -128,6 +185,7 @@ export function extractMetadata(playerResponse: any, videoId: string): VideoMeta
     description,
     thumbnailUrl,
     channelAvatarUrl,
+    subscriberInfo,
     isShort
   };
 }
