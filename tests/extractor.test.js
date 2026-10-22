@@ -351,6 +351,49 @@ it('LRU Cache evicts oldest item when max capacity is reached', () => {
 });
 
 // ----------------------------------------------------------------------
+// Test Group 7: Metric Accuracy Hardening (P1.02)
+// ----------------------------------------------------------------------
+console.log('\n--- Group 7: Metric Accuracy Hardening ---');
+
+function parseUploadDate(rawDate) {
+  if (!rawDate || rawDate === 'Unknown Date') return { monthDay: 'N/A', year: 'Date' };
+  try {
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const month = d.toLocaleString('en-US', { month: 'short' });
+      const day = d.getDate();
+      const year = d.getFullYear().toString();
+      return { monthDay: `${month} ${day}`, year };
+    }
+  } catch {}
+  return { monthDay: 'N/A', year: 'Date' };
+}
+
+function formatLikesDisplay(likeCount) {
+  return likeCount && likeCount !== 'N/A' ? likeCount : 'N/A';
+}
+
+it('missing or N/A likes render N/A and never 484', () => {
+  assert.strictEqual(formatLikesDisplay(undefined), 'N/A');
+  assert.strictEqual(formatLikesDisplay(null), 'N/A');
+  assert.strictEqual(formatLikesDisplay('N/A'), 'N/A');
+  assert.notStrictEqual(formatLikesDisplay(undefined), '484');
+  assert.strictEqual(formatLikesDisplay('0'), '0');
+  assert.strictEqual(formatLikesDisplay('12K'), '12K');
+});
+
+it('unknown or invalid dates render N/A Date and never 2026', () => {
+  assert.deepStrictEqual(parseUploadDate(undefined), { monthDay: 'N/A', year: 'Date' });
+  assert.deepStrictEqual(parseUploadDate('Unknown Date'), { monthDay: 'N/A', year: 'Date' });
+  assert.deepStrictEqual(parseUploadDate('invalid-date-string'), { monthDay: 'N/A', year: 'Date' });
+  assert.notStrictEqual(parseUploadDate('invalid-date-string').year, '2026');
+
+  const valid = parseUploadDate('2024-05-15T00:00:00Z');
+  assert.strictEqual(valid.year, '2024');
+  assert.ok(valid.monthDay.includes('May'));
+});
+
+// ----------------------------------------------------------------------
 // Test Summary
 // ----------------------------------------------------------------------
 console.log('\n======================================================');

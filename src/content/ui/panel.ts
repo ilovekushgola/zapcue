@@ -109,7 +109,7 @@ export class ExtractorPanel {
   }
 
   private parseUploadDate(rawDate?: string): { monthDay: string; year: string } {
-    if (!rawDate) return { monthDay: 'Recent', year: 'Video' };
+    if (!rawDate || rawDate === 'Unknown Date') return { monthDay: 'N/A', year: 'Date' };
     try {
       const d = new Date(rawDate);
       if (!isNaN(d.getTime())) {
@@ -121,7 +121,7 @@ export class ExtractorPanel {
     } catch {
       // Ignore parse failure
     }
-    return { monthDay: 'Recent', year: '2026' };
+    return { monthDay: 'N/A', year: 'Date' };
   }
 
   private seekVideo(seconds: number): void {
@@ -178,7 +178,7 @@ export class ExtractorPanel {
 
     // Format views, likes, and dates for stats row
     const viewsDisplay = m ? this.formatViews(m.viewCount) : '0';
-    const likesDisplay = m?.likeCount && m.likeCount !== 'N/A' ? m.likeCount : '484';
+    const likesDisplay = m?.likeCount && m.likeCount !== 'N/A' ? m.likeCount : 'N/A';
     const dateInfo = this.parseUploadDate(m?.uploadDate);
 
     // Format description text paragraphs
